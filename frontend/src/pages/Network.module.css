@@ -1,0 +1,69 @@
+.page { padding: 32px; animation: fadeUp 0.4s ease both; }
+.loading { display: flex; align-items: center; justify-content: center; height: 60vh; }
+.spinner { width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+.header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+.headerLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.headerTitle { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.headerRight { display: flex; align-items: center; gap: 12px; }
+.lastRefresh { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: 0.5px; }
+.refreshBtn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text3); padding: 7px; display: flex; transition: color 0.15s, border-color 0.15s; }
+.refreshBtn:hover { color: var(--text); border-color: var(--border2); }
+.refreshBtn:disabled { opacity: 0.5; }
+.spinning svg { animation: spin 0.7s linear infinite; }
+
+.errorBanner { display: flex; align-items: center; gap: 8px; background: rgba(240,64,96,0.08); border: 1px solid rgba(240,64,96,0.2); border-radius: var(--radius); padding: 12px 16px; color: var(--red); font-size: 13px; margin-bottom: 20px; }
+.cacheNote { color: var(--text3); font-size: 12px; margin-left: 4px; }
+
+/* SUMMARY */
+.summaryRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.summaryCard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+.summaryVal { font-family: var(--font-display); font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+.summaryLbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); }
+
+/* AP GRID */
+.apGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+
+.apCard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; display: flex; flex-direction: column; gap: 14px; transition: border-color 0.2s; }
+.apCard.online { border-left: 3px solid var(--green); }
+.apCard.offline { border-left: 3px solid var(--red); opacity: 0.7; }
+.apCard:hover { border-color: var(--border2); }
+
+.apHeader { display: flex; align-items: center; justify-content: space-between; }
+.apTitleRow { display: flex; align-items: center; gap: 10px; }
+.statusDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dotOnline { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2.5s ease infinite; }
+.dotOffline { background: var(--red); }
+.apName { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); }
+
+.statusBadge { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; }
+.badgeOnline { background: rgba(13,187,133,0.12); color: var(--green); }
+.badgeOffline { background: rgba(240,64,96,0.1); color: var(--red); }
+
+.apMeta { display: flex; gap: 6px; flex-wrap: wrap; }
+.metaChip { font-family: var(--font-mono); font-size: 10px; color: var(--text3); background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; letter-spacing: 0.5px; }
+
+.apStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.apStat { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.apStatVal { font-family: var(--font-mono); font-size: 13px; color: var(--text); font-weight: 500; text-align: center; }
+.apStatLbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); }
+
+.apTraffic { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border); padding-top: 12px; }
+.trafficRow { display: flex; justify-content: space-between; align-items: center; }
+.trafficLbl { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: 1px; }
+.trafficVal { font-family: var(--font-mono); font-size: 12px; color: var(--text2); }
+
+.apResources { display: flex; flex-direction: column; gap: 8px; }
+.resourceRow { display: flex; flex-direction: column; gap: 4px; }
+.resourceLabel { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: 0.5px; }
+.usageBar { height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.usageFill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+.apFirmware { font-family: var(--font-mono); font-size: 10px; color: var(--text3); text-align: right; letter-spacing: 0.5px; }
+
+/* EMPTY */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 300px; color: var(--text3); font-size: 15px; }
+.emptySub { font-family: var(--font-mono); font-size: 11px; color: var(--text3); letter-spacing: 0.5px; }
+
+.apStatClickable { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.apStatClickable:hover { border-color: var(--cyan); background: rgba(13,207,207,0.06); }

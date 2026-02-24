@@ -1,0 +1,69 @@
+.page { padding: 32px; animation: fadeUp 0.4s ease both; }
+.loading { display: flex; align-items: center; justify-content: center; height: 60vh; }
+.spinner { width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+.header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; }
+.headerLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.headerTitle { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+
+.createBtn { display: flex; align-items: center; gap: 8px; background: var(--accent); color: #000; border: none; border-radius: var(--radius); padding: 10px 18px; font-family: var(--font-display); font-size: 14px; font-weight: 700; transition: opacity 0.15s, transform 0.15s; }
+.createBtn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+.sectionLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; position: relative; transition: border-color 0.2s, transform 0.2s; display: flex; flex-direction: column; gap: 10px; }
+.card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.card.inactive { opacity: 0.5; }
+
+.promoBadge { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 4px; background: rgba(240,165,0,0.15); color: var(--accent); font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 3px 8px; border-radius: 20px; }
+
+.cardTop { display: flex; justify-content: space-between; align-items: flex-start; }
+.cardName { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text); }
+.cardPrice { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--accent); }
+
+.cardMeta { display: flex; gap: 10px; flex-wrap: wrap; }
+.metaItem { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--text2); letter-spacing: 0.5px; }
+
+.cardSite { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+
+.cardStats { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--text2); border-top: 1px solid var(--border); padding-top: 10px; margin-top: auto; }
+
+.cardActions { display: flex; gap: 8px; }
+.editBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); font-size: 12px; padding: 7px; transition: border-color 0.15s, color 0.15s; }
+.editBtn:hover { border-color: var(--accent); color: var(--accent); }
+.toggleBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); font-size: 12px; padding: 7px; transition: border-color 0.15s; }
+.toggleBtn:hover { border-color: var(--border2); }
+
+.addCard { background: var(--surface); border: 1px dashed var(--border2); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text3); font-size: 13px; min-height: 180px; transition: border-color 0.15s, color 0.15s; }
+.addCard:hover { border-color: var(--accent); color: var(--accent); }
+
+/* MODAL */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 24px; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; animation: fadeUp 0.2s ease; }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; padding: 24px 28px 0; }
+.modalTitle { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.closeBtn { background: none; border: none; color: var(--text3); font-size: 18px; line-height: 1; padding: 4px 8px; transition: color 0.15s; }
+.closeBtn:hover { color: var(--text); }
+
+.form { padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 16px; }
+.formRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text2); }
+.input { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 10px 12px; font-size: 13.5px; outline: none; transition: border-color 0.15s; width: 100%; }
+.input:focus { border-color: var(--accent); }
+.input option { background: var(--surface2); }
+.hint { font-family: var(--font-mono); font-size: 10px; color: var(--accent); margin-top: 2px; }
+
+.checkRow { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text2); cursor: pointer; }
+.checkRow input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+.error { background: rgba(240,64,96,0.1); border: 1px solid rgba(240,64,96,0.3); border-radius: var(--radius); color: var(--red); padding: 10px 14px; font-size: 13px; }
+
+.formActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+.cancelBtn { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text2); padding: 10px 20px; font-size: 13.5px; transition: border-color 0.15s; }
+.cancelBtn:hover { border-color: var(--border2); }
+.saveBtn { background: var(--accent); color: #000; border: none; border-radius: var(--radius); padding: 10px 24px; font-family: var(--font-display); font-size: 14px; font-weight: 700; transition: opacity 0.15s; display: flex; align-items: center; min-width: 130px; justify-content: center; }
+.saveBtn:hover:not(:disabled) { opacity: 0.9; }
+.saveBtn:disabled { opacity: 0.6; }

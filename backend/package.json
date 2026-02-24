@@ -1,0 +1,15 @@
+{
+  "name": "monarch-wireless-backend",
+  "version": "1.0.0",
+  "description": "Monarch Wireless Hotspot Management API",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "keywords": ["hotspot", "wifi", "monarch"],
+  "author": "Monarch Wireless",
+  "license": "UNLICENSED",
+  "private": true
+}
