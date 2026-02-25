@@ -36,6 +36,7 @@ app.use('/api/packages',  require('./routes/packages'));
 app.use('/api/vouchers',  require('./routes/vouchers'));
 app.use('/api/users',     require('./routes/users'));
 app.use('/api/mpesa',     require('./routes/mpesa'));
+app.use('/api/sms',       require('./routes/sms-settings'));
 
 // ── Captive portal (public — no auth)
 app.use('/portal', require('./routes/portal'));

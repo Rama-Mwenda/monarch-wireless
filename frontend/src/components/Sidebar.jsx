@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Wifi, Package, Users,
-  Ticket, BarChart2, LogOut, Settings
+  Ticket, BarChart2, LogOut, Settings, MessageSquare
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
@@ -13,6 +13,7 @@ const nav = [
   { to: '/vouchers',  icon: Ticket,          label: 'Vouchers'  },
   { to: '/users',     icon: Users,           label: 'Users'     },
   { to: '/reports',   icon: BarChart2,       label: 'Reports'   },
+  { to: '/sms',       icon: MessageSquare,   label: 'SMS'       },
 ];
 
 export default function Sidebar() {

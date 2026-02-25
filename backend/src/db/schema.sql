@@ -181,3 +181,53 @@ CREATE INDEX IF NOT EXISTS idx_vouchers_code     ON vouchers(code);
 CREATE INDEX IF NOT EXISTS idx_users_phone       ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_sms_log_user      ON sms_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_mpesa_checkout    ON mpesa_transactions(checkout_request_id);
+
+-- SMS Providers table
+CREATE TABLE IF NOT EXISTS sms_providers (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  name        TEXT NOT NULL UNIQUE,
+  label       TEXT NOT NULL,
+  api_token   TEXT,
+  sender_id   TEXT,
+  extra_config TEXT,         -- JSON for any extra fields
+  is_active   INTEGER NOT NULL DEFAULT 0,
+  is_default  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- SMS Templates table
+CREATE TABLE IF NOT EXISTS sms_templates (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  name        TEXT NOT NULL UNIQUE,
+  label       TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  is_active   INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Seed default provider
+INSERT OR IGNORE INTO sms_providers (name, label, is_active, is_default)
+VALUES ('talksasa', 'Talksasa', 1, 1);
+
+INSERT OR IGNORE INTO sms_providers (name, label, is_active, is_default)
+VALUES ('africas_talking', 'Africa''s Talking', 0, 0);
+
+-- Seed default templates
+INSERT OR IGNORE INTO sms_templates (name, label, content, is_active) VALUES
+('session_started',   'Payment Confirmed',
+ 'Hi! You are now connected to [[company]]. Package: [[package]] ([[duration]]). Expires: [[expiry]]. Ref: [[receipt]]. Enjoy browsing!',
+ 1),
+('session_expiring',  'Session Expiring Soon',
+ 'Hi! Your [[company]] [[package]] session expires in [[minutes]] mins. Renew at [[portal_url]] to stay connected.',
+ 1),
+('session_expired',   'Session Expired',
+ 'Your [[company]] [[package]] session has ended. Reconnect at [[portal_url]].',
+ 1),
+('voucher_redeemed',  'Voucher Redeemed',
+ 'Hi! Voucher redeemed on [[company]]. Package: [[package]] ([[duration]]). Expires: [[expiry]]. Enjoy browsing!',
+ 1),
+('custom',            'Custom Broadcast',
+ 'Hi from [[company]]! [[message]]',
+ 1);

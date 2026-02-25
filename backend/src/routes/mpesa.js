@@ -1,6 +1,7 @@
 const express = require('express');
 const db      = require('../db');
 const mpesa   = require('../services/mpesa');
+const sms     = require('../services/sms');
 
 const router = express.Router();
 
@@ -196,6 +197,17 @@ router.post('/callback', async (req, res) => {
       `).run(newSpent, newSessions, newPoints, newPunch, newTier, user.id);
 
       console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
+
+      // Send confirmation SMS (non-blocking)
+      if (!txn.phone.startsWith('mac:')) {
+        sms.sessionStarted({
+          phone:       txn.phone,
+          packageName: pkg.name,
+          duration:    sms.fmtDuration(pkg.duration_minutes),
+          expiresAt:   endAt,
+          receipt:     mpesaReceipt,
+        }).catch(console.error);
+      }
 
     } else {
       // ── PAYMENT FAILED ───────────────────────────────────

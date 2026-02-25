@@ -19,7 +19,6 @@ export default function MpesaPayModal({ onClose, preselectedPackage }) {
   const countdownRef = useRef(null);
 
   // Load packages
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get('/packages').then(r => {
       const list = Array.isArray(r.data) ? r.data : (r.data.packages || []);

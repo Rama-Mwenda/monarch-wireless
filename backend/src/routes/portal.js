@@ -1,6 +1,7 @@
 const express = require('express');
 const path    = require('path');
 const db      = require('../db');
+const sms     = require('../services/sms');
 
 const router = express.Router();
 
@@ -80,6 +81,17 @@ router.post('/vouchers/redeem', (req, res) => {
 
   db.prepare(`UPDATE users SET total_sessions=total_sessions+1, last_seen=datetime('now') WHERE id=?`)
     .run(user.id);
+
+  // Send SMS confirmation (non-blocking, only if real phone)
+  if (user.phone && !user.phone.startsWith('mac:')) {
+    sms.voucherRedeemed({
+      userId:      user.id,
+      phone:       user.phone,
+      packageName: voucher.package_name,
+      duration:    sms.fmtDuration(voucher.duration_minutes),
+      expiresAt:   endAt,
+    }).catch(console.error);
+  }
 
   res.json({
     message:          'Voucher redeemed successfully',

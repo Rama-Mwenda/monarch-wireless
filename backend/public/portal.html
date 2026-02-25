@@ -902,10 +902,11 @@
   function checkVoucherInput() {
     const code = document.getElementById('voucher-code').value;
     const btn  = document.getElementById('btn-redeem');
-    btn.disabled = code.length < 13;
+    btn.disabled = true;  // always disable until lookup succeeds
     document.getElementById('voucher-info').style.display = 'none';
     hideError('voucher');
-    if (code.length === 12) lookupVoucher(code);
+    voucherData = null;
+    if (code.length >= 11) lookupVoucher(code);
   }
 
   async function lookupVoucher(code) {
@@ -917,6 +918,7 @@
         document.getElementById('v-pkg').textContent    = data.voucher.package_name;
         document.getElementById('v-dur').textContent    = fmtDur(data.voucher.duration_minutes);
         document.getElementById('voucher-info').style.display = 'block';
+        document.getElementById('btn-redeem').disabled = false;  // enable on valid lookup
         hideError('voucher');
       } else {
         voucherData = null;
