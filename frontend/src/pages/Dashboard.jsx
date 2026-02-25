@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Users, Wifi, CreditCard, Activity, Star } from 'lucide-react';
 import api from '../services/api';
 import styles from './Dashboard.module.css';
+import MpesaButton from '../components/MpesaButton';
 
 const TIER_COLORS = {
   platinum: '#e2e8f0',
@@ -74,6 +75,7 @@ export default function Dashboard() {
             <span className={styles.liveDot} />
             Live
           </div>
+          <MpesaButton label="Collect Payment" />
         </div>
       </div>
 

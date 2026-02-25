@@ -3,16 +3,22 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');                          // ← ADD 1: path import
 
 const app = express();
 
 // ── Security middleware ──────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,                        // ← needed for portal HTML to load
+}));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
 app.use(express.json());
+
+// Serve portal static files                           // ← ADD 2: static files
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Global rate limit — 200 requests per 15 min per IP
 app.use(rateLimit({
@@ -29,6 +35,10 @@ app.use('/api/network',   require('./routes/network'));
 app.use('/api/packages',  require('./routes/packages'));
 app.use('/api/vouchers',  require('./routes/vouchers'));
 app.use('/api/users',     require('./routes/users'));
+app.use('/api/mpesa',     require('./routes/mpesa'));
+
+// ── Captive portal (public — no auth)
+app.use('/portal', require('./routes/portal'));
 
 // ── Health check ─────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -58,6 +68,7 @@ app.listen(PORT, () => {
   console.log(`  📡 Running at http://localhost:${PORT}`);
   console.log(`  🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`  🗄️  Database: ./data/monarch.db`);
+  console.log(`  🌐 Portal at http://localhost:${PORT}/portal`);
   console.log('');
   console.log('  Default admin: admin / admin123');
   console.log('  Change this password immediately!');

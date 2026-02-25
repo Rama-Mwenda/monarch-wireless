@@ -333,3 +333,9 @@
   font-size: 12px;
   letter-spacing: 1px;
 }
+
+.headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
