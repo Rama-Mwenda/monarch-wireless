@@ -264,6 +264,56 @@
     font-weight: 400;
   }
 
+  /* ── Most Popular badge ── */
+  .pkg.popular {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(240,165,0,0.15);
+    animation: popularPulse 2.5s ease-in-out infinite;
+  }
+
+  .pkg.popular.selected {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 28px rgba(240,165,0,0.25);
+  }
+
+  .popular-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, var(--accent), #ff8c00);
+    color: #000;
+    font-family: var(--font-m);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-top: 3px;
+    width: fit-content;
+  }
+
+  .popular-dot {
+    width: 5px;
+    height: 5px;
+    background: #000;
+    border-radius: 50%;
+    animation: dotPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes popularPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(240,165,0,0.12);
+    }
+    50% {
+      box-shadow: 0 0 0 2px var(--accent), 0 0 28px rgba(240,165,0,0.35);
+    }
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.6); }
+  }
+
   /* ── Form fields ── */
   .field { display: flex; flex-direction: column; gap: 7px; }
   .label {
@@ -723,7 +773,7 @@
         <div class="session-row"><span>Duration</span><span id="s-dur">—</span></div>
         <div class="session-row"><span>Expires</span><span id="s-expires">—</span></div>
       </div>
-      <button class="btn-done" onclick="window.location.href='http://connectivitycheck.gstatic.com/generate_204'">
+      <button class="btn-done" onclick="window.location.href=getOmadaParams().redirectUrl">
         Start Browsing →
       </button>
     </div>
@@ -777,17 +827,30 @@
       grid.innerHTML = '<div style="color:var(--text2);font-size:13px">No packages available.</div>';
       return;
     }
-    grid.innerHTML = packages.map((p, i) => `
-      <div class="pkg${i===0?' selected':''}" onclick="selectPkg('${p.id}')" id="pkg-${p.id}" tabindex="0">
-        <div class="pkg-radio"${i===0?' style="border-color:var(--accent);background:var(--accent)"':''}>${i===0?'<div style="width:6px;height:6px;background:#000;border-radius:50%"></div>':''}</div>
+    // Auto-select most popular if exists, otherwise first
+    const popular = packages.find(p => p.is_popular) || packages[0];
+    selectedPkg = popular;
+
+    grid.innerHTML = packages.map((p) => {
+      const isSelected = p.id === popular.id;
+      const isPopular  = !!p.is_popular;
+      return `
+      <div class="pkg${isSelected ? ' selected' : ''}${isPopular ? ' popular' : ''}"
+           onclick="selectPkg('${p.id}')" id="pkg-${p.id}" tabindex="0">
+        <div class="pkg-radio"${isSelected ? ' style="border-color:var(--accent);background:var(--accent)"' : ''}>
+          ${isSelected ? '<div style="width:6px;height:6px;background:#000;border-radius:50%"></div>' : ''}
+        </div>
         <div class="pkg-info">
           <div class="pkg-name">${p.name}</div>
-          <div class="pkg-dur">${fmtDur(p.duration_minutes)}</div>
+          ${isPopular
+            ? '<div class="popular-badge"><span class="popular-dot"></span> Most Popular</div>'
+            : `<div class="pkg-dur">${fmtDur(p.duration_minutes)}</div>`
+          }
+          ${isPopular ? `<div class="pkg-dur" style="margin-top:2px">${fmtDur(p.duration_minutes)}</div>` : ''}
         </div>
         <div class="pkg-price">KES ${p.price}<span>/use</span></div>
-      </div>
-    `).join('');
-    selectedPkg = packages[0];
+      </div>`;
+    }).join('');
     updateSummary();
   }
 
@@ -840,7 +903,7 @@
       const res = await fetch(`/api/mpesa/stk-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, package_id: selectedPkg.id })
+        body: JSON.stringify({ phone, package_id: selectedPkg.id, ...getOmadaParams() })
       });
       const data = await res.json();
 
@@ -937,7 +1000,7 @@
       const res  = await fetch(`/portal/vouchers/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, mac: getClientMac() })
+        body: JSON.stringify({ code, ...getOmadaParams() })
       });
       const data = await res.json();
 
@@ -1033,9 +1096,21 @@
     clearInterval(cdTimer);
   }
 
+  // Parse all params Omada injects into the redirect URL
+  function getOmadaParams() {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      mac:      p.get('clientMac') || p.get('mac') || '',
+      apMac:    p.get('apMac')     || p.get('ap')  || '',
+      ssidName: p.get('ssidName')  || p.get('ssid') || '',
+      radioId:  p.get('radioId')   || p.get('rid')  || '',
+      site:     p.get('site')      || '',
+      redirectUrl: p.get('redirectUrl') || 'http://connectivitycheck.gstatic.com/generate_204',
+    };
+  }
+
   function getClientMac() {
-    // Omada injects client MAC as URL param ?mac=XX:XX:XX
-    return new URLSearchParams(window.location.search).get('mac') || '';
+    return getOmadaParams().mac;
   }
 </script>
 </body>

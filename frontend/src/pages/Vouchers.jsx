@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Copy, Check, RefreshCw, Filter } from 'lucide-react';
+import { Plus, Copy, Check, RefreshCw, Filter, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import styles from './Vouchers.module.css';
 
@@ -37,15 +37,17 @@ export default function Vouchers() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showGenerated, setShowGenerated] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // all | available | used | expired
   const [form, setForm] = useState({ package_id: '', quantity: 1, expires_at: '' });
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]       = useState('');
+  const [selected, setSelected] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     try {
       const [vRes, pRes] = await Promise.all([
-        api.get('/vouchers'),
+        api.get('/vouchers?status=' + (filter === 'all' ? '' : filter)),
         api.get('/packages?active_only=true'),
       ]);
       setVouchers(vRes.data);
@@ -57,7 +59,43 @@ export default function Vouchers() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function deleteOne(id) {
+    if (!confirm('Delete this voucher?')) return;
+    try {
+      await api.delete('/vouchers/' + id);
+      load();
+    } catch(e) { alert(e.response?.data?.error || 'Delete failed'); }
+  }
+
+  async function deleteSelected() {
+    if (!selected.size || !confirm('Delete ' + selected.size + ' voucher(s)?')) return;
+    setDeleting(true);
+    try {
+      await api.post('/vouchers/bulk-delete', { ids: [...selected] });
+      setSelected(new Set());
+      load();
+    } catch { alert('Bulk delete failed'); }
+    setDeleting(false);
+  }
+
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const deletable = filtered.filter(v => v.computed_status !== 'used');
+    if (selected.size === deletable.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(deletable.map(v => v.id)));
+    }
+  }
 
   async function handleGenerate(e) {
     e.preventDefault();
@@ -83,14 +121,12 @@ export default function Vouchers() {
     navigator.clipboard.writeText(codes.join('\n'));
   }
 
-  const filtered = vouchers.filter(v => {
-    if (filter === 'unused') return !v.is_used;
-    if (filter === 'used') return v.is_used;
-    return true;
-  });
+  // Backend already filters by status — just use all returned vouchers
+  const filtered = vouchers;
 
-  const unusedCount = vouchers.filter(v => !v.is_used).length;
-  const usedCount = vouchers.filter(v => v.is_used).length;
+  const unusedCount  = vouchers.filter(v => v.computed_status === 'available').length;
+  const usedCount    = vouchers.filter(v => v.computed_status === 'used').length;
+  const expiredCount = vouchers.filter(v => v.computed_status === 'expired').length;
 
   if (loading) return <div className={styles.loading}><div className={styles.spinner} /></div>;
 
@@ -120,17 +156,26 @@ export default function Vouchers() {
           <div className={styles.statVal} style={{ color: 'var(--text3)' }}>{usedCount}</div>
           <div className={styles.statLbl}>Used</div>
         </div>
+        <div className={styles.statBox}>
+          <div className={styles.statVal} style={{ color: 'var(--red)' }}>{expiredCount}</div>
+          <div className={styles.statLbl}>Expired</div>
+        </div>
       </div>
 
       {/* Filter */}
       <div className={styles.filterRow}>
         <Filter size={13} color="var(--text3)" />
-        {['all', 'unused', 'used'].map(f => (
+        {['all', 'available', 'used', 'expired'].map(f => (
           <button key={f} className={`${styles.filterBtn} ${filter === f ? styles.filterActive : ''}`}
             onClick={() => setFilter(f)}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
+        {selected.size > 0 && (
+          <button className={styles.deleteSelectedBtn} onClick={deleteSelected} disabled={deleting}>
+            <Trash2 size={12} /> {deleting ? 'Deleting...' : `Delete ${selected.size} selected`}
+          </button>
+        )}
         <button className={styles.refreshBtn} onClick={load} title="Refresh">
           <RefreshCw size={13} />
         </button>
@@ -141,6 +186,9 @@ export default function Vouchers() {
         <table className={styles.table}>
           <thead>
             <tr>
+              <th><input type="checkbox" onChange={toggleSelectAll}
+                checked={selected.size > 0 && selected.size === filtered.filter(v=>v.computed_status!=='used').length}
+                style={{accentColor:'var(--accent)'}}/></th>
               <th>Code</th>
               <th>Package</th>
               <th>Price</th>
@@ -148,29 +196,53 @@ export default function Vouchers() {
               <th>Status</th>
               <th>Used By</th>
               <th>Created</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} className={styles.empty}>No vouchers found</td></tr>
+              <tr><td colSpan={9} className={styles.empty}>No vouchers found</td></tr>
             ) : filtered.map(v => (
-              <tr key={v.id} className={v.is_used ? styles.usedRow : ''}>
+              <tr key={v.id} className={
+                v.computed_status === 'used' ? styles.usedRow :
+                v.computed_status === 'expired' ? styles.expiredRow : ''
+              }>
+                <td>
+                  {v.computed_status !== 'used' && (
+                    <input type="checkbox"
+                      checked={selected.has(v.id)}
+                      onChange={() => toggleSelect(v.id)}
+                      style={{accentColor:'var(--accent)'}}/>
+                  )}
+                </td>
                 <td>
                   <div className={styles.codeCell}>
                     <span className={styles.code}>{v.code}</span>
-                    {!v.is_used && <CopyButton text={v.code} />}
+                    {v.computed_status === 'available' && <CopyButton text={v.code} />}
                   </div>
                 </td>
                 <td>{v.package_name}</td>
                 <td className={styles.mono}>KES {v.price}</td>
                 <td className={styles.mono}>{formatDuration(v.duration_minutes)}</td>
                 <td>
-                  <span className={`${styles.badge} ${v.is_used ? styles.badgeUsed : styles.badgeAvail}`}>
-                    {v.is_used ? 'Used' : 'Available'}
+                  <span className={`${styles.badge} ${
+                    v.computed_status === 'used'    ? styles.badgeUsed :
+                    v.computed_status === 'expired' ? styles.badgeExpired :
+                    styles.badgeAvail
+                  }`}>
+                    {v.computed_status === 'used' ? 'Used' :
+                     v.computed_status === 'expired' ? 'Expired' : 'Available'}
                   </span>
                 </td>
                 <td className={styles.mono}>{v.used_by_phone || '—'}</td>
                 <td className={styles.mono}>{v.created_at?.slice(0, 10)}</td>
+                <td>
+                  {v.computed_status !== 'used' && (
+                    <button className={styles.deleteBtn} onClick={() => deleteOne(v.id)} title="Delete">
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

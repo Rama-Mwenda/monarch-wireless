@@ -2,6 +2,8 @@ const express = require('express');
 const path    = require('path');
 const db      = require('../db');
 const sms     = require('../services/sms');
+const macAuth   = require('../helpers/mac-auth-helper');
+const punchcard = require('../helpers/punchcard');
 
 const router = express.Router();
 
@@ -13,12 +15,32 @@ router.get('/', (req, res) => {
 // ── GET /portal/packages — PUBLIC, no auth needed
 router.get('/packages', (req, res) => {
   const packages = db.prepare(`
-    SELECT id, name, price, duration_minutes, data_cap_mb, is_active
-    FROM packages
-    WHERE is_active = 1
-    ORDER BY price ASC
+    SELECT
+      p.id, p.name, p.price, p.duration_minutes, p.data_cap_mb, p.is_active, p.is_promo,
+      COALESCE(SUM(s.amount_paid), 0) as total_revenue
+    FROM packages p
+    LEFT JOIN sessions s ON s.package_id = p.id
+      AND s.start_at >= datetime('now', '-30 days')
+    WHERE p.is_active = 1
+    GROUP BY p.id
+    ORDER BY p.price ASC
   `).all();
-  res.json(packages);
+
+  // Calculate revenue share and mark most popular
+  const totalRevenue = packages.reduce((sum, p) => sum + p.total_revenue, 0);
+  const withShare = packages.map(p => ({
+    ...p,
+    revenue_share: totalRevenue > 0 ? (p.total_revenue / totalRevenue) : 0,
+  }));
+
+  // Most popular = highest revenue share, only badge if >25% share
+  const maxRevenue = Math.max(...withShare.map(p => p.total_revenue));
+  const result = withShare.map(p => ({
+    ...p,
+    is_popular: maxRevenue > 0 && p.total_revenue === maxRevenue && p.revenue_share >= 0.25,
+  }));
+
+  res.json(result);
 });
 
 // ── GET /portal/vouchers/lookup?code=MW-XXXX-XXXX — PUBLIC
@@ -81,6 +103,29 @@ router.post('/vouchers/redeem', (req, res) => {
 
   db.prepare(`UPDATE users SET total_sessions=total_sessions+1, last_seen=datetime('now') WHERE id=?`)
     .run(user.id);
+
+  // Punchcard check (non-blocking)
+  if (user.phone && !user.phone.startsWith('mac:')) {
+    punchcard.checkPunchcard(user.id, user.phone).catch(console.error);
+  }
+
+  // Authorize MAC with Omada (non-blocking)
+  if (mac) {
+    const sessionRow = db.prepare('SELECT id FROM sessions WHERE user_id=? ORDER BY start_at DESC LIMIT 1').get(user.id);
+    if (sessionRow) {
+      macAuth.authorizeSession({
+        sessionId:       sessionRow.id,
+        userId:          user.id,
+        packageId:       voucher.package_id,
+        clientMac:       mac,
+        apMac:           req.body.apMac    || null,
+        ssidName:        req.body.ssidName || null,
+        radioId:         req.body.radioId  || null,
+        site:            process.env.OMADA_SITE_NAME,
+        durationMinutes: voucher.duration_minutes,
+      }).catch(e => console.error('MAC auth error:', e.message));
+    }
+  }
 
   // Send SMS confirmation (non-blocking, only if real phone)
   if (user.phone && !user.phone.startsWith('mac:')) {

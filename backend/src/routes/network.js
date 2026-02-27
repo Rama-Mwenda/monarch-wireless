@@ -87,4 +87,15 @@ router.get('/stats', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/network/reconnect — force Omada cache clear + re-auth
+router.post('/reconnect', requireAuth, async (req, res) => {
+  try {
+    omada.clearCache();
+    const stats = await omada.getSiteStats();
+    res.json({ message: 'Reconnected to Omada', stats });
+  } catch(err) {
+    res.status(502).json({ error: 'Reconnect failed', detail: err.message });
+  }
+});
+
 module.exports = router;

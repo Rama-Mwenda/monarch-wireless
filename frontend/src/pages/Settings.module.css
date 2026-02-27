@@ -1,0 +1,51 @@
+.page { padding: 32px; animation: fadeUp 0.4s ease both; }
+.header { margin-bottom: 24px; }
+.headerLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.headerTitle { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px; margin-bottom: 24px; width: fit-content; }
+.tab { display: flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); border: none; background: none; cursor: pointer; transition: color 0.15s, background 0.15s; }
+.tab:hover { color: var(--text); }
+.tabActive { background: var(--surface2) !important; color: var(--accent) !important; border: 1px solid var(--border2); }
+
+.section { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+.sectionDesc { font-size: 13px; color: var(--text2); line-height: 1.6; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); border-left: 3px solid var(--accent); }
+
+.formCard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.cardTitle { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text2); margin-bottom: 4px; }
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.formRow { display: flex; flex-direction: column; gap: 6px; }
+.formLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text2); }
+.formInput { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font-mono); font-size: 13px; padding: 10px 14px; outline: none; transition: border-color 0.15s; width: 100%; }
+.formInput:focus { border-color: var(--accent); }
+.formSelect { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font-mono); font-size: 13px; padding: 10px 14px; outline: none; width: 100%; }
+.pwRow { display: flex; gap: 8px; }
+.eyeBtn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text2); padding: 0 12px; cursor: pointer; flex-shrink: 0; }
+.saveBtn { display: flex; align-items: center; gap: 8px; background: var(--accent); border: none; border-radius: var(--radius); color: #000; font-family: var(--font-display); font-size: 13px; font-weight: 700; padding: 11px 20px; cursor: pointer; width: fit-content; transition: opacity 0.15s; }
+.saveBtn:hover:not(:disabled) { opacity: 0.88; }
+.saveBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Admin list */
+.adminList { display: flex; flex-direction: column; gap: 10px; }
+.adminRow { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; transition: border-color 0.15s; }
+.adminSelf { border-color: var(--accent); }
+.adminAvatar { width: 38px; height: 38px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 16px; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+.adminInfo { flex: 1; }
+.adminName { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.adminEmail { font-family: var(--font-mono); font-size: 11px; color: var(--text3); margin-top: 2px; }
+.adminMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.adminLastLogin { font-family: var(--font-mono); font-size: 10px; color: var(--text3); }
+.youBadge { font-family: var(--font-mono); font-size: 9px; background: rgba(240,165,0,0.1); color: var(--accent); border: 1px solid rgba(240,165,0,0.2); border-radius: 20px; padding: 2px 8px; }
+.roleBadge { font-family: var(--font-mono); font-size: 10px; border-radius: 20px; padding: 3px 10px; text-transform: capitalize; }
+.role_super_admin  { background: rgba(240,165,0,0.1);  color: var(--accent); border: 1px solid rgba(240,165,0,0.2); }
+.role_site_manager { background: rgba(13,187,133,0.1); color: var(--green);  border: 1px solid rgba(13,187,133,0.2); }
+.role_viewer       { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.deleteAdminBtn { background: none; border: none; color: var(--text3); cursor: pointer; padding: 6px; border-radius: 6px; transition: color 0.15s, background 0.15s; }
+.deleteAdminBtn:hover { color: var(--red); background: rgba(240,64,96,0.08); }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: var(--radius); font-size: 13px; font-weight: 500; z-index: 1000; animation: fadeUp 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+.success { background: rgba(13,187,133,0.15); border: 1px solid rgba(13,187,133,0.3); color: var(--green); }
+.error   { background: rgba(240,64,96,0.15);  border: 1px solid rgba(240,64,96,0.3);  color: var(--red); }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }

@@ -79,7 +79,7 @@ router.patch('/:id',
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
     const fields = ['name','price','duration_minutes','data_cap_mb','download_kbps',
-                    'upload_kbps','loyalty_points','is_active','is_promo','promo_start','promo_end'];
+                    'upload_kbps','loyalty_points','is_active','is_promo','promo_start','promo_end','device_limit'];
     const updates = [];
     const values = [];
 

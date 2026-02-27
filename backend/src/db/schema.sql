@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS packages (
   is_promo            INTEGER NOT NULL DEFAULT 0,
   promo_start         TEXT,
   promo_end           TEXT,
+  device_limit        INTEGER NOT NULL DEFAULT 1,
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -120,7 +121,14 @@ CREATE TABLE IF NOT EXISTS sessions (
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','terminated')),
   start_at        TEXT NOT NULL DEFAULT (datetime('now')),
   end_at          TEXT NOT NULL,
-  terminated_at   TEXT
+  terminated_at   TEXT,
+  client_mac      TEXT,
+  ap_mac          TEXT,
+  ssid_name       TEXT,
+  radio_id        INTEGER,
+  omada_authed      INTEGER NOT NULL DEFAULT 0,
+  omada_auth_method TEXT,
+  warned_expiry     INTEGER NOT NULL DEFAULT 0
 );
 
 -- ------------------------------------------------------------
@@ -139,7 +147,11 @@ CREATE TABLE IF NOT EXISTS mpesa_transactions (
   result_code       INTEGER,
   result_desc       TEXT,
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  completed_at      TEXT
+  completed_at      TEXT,
+  client_mac        TEXT,
+  ap_mac            TEXT,
+  ssid_name         TEXT,
+  radio_id          INTEGER
 );
 
 -- ------------------------------------------------------------
@@ -171,32 +183,26 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- ------------------------------------------------------------
--- INDEXES
--- ------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_sessions_user     ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_status   ON sessions(status);
-CREATE INDEX IF NOT EXISTS idx_sessions_end_at   ON sessions(end_at);
-CREATE INDEX IF NOT EXISTS idx_vouchers_code     ON vouchers(code);
-CREATE INDEX IF NOT EXISTS idx_users_phone       ON users(phone);
-CREATE INDEX IF NOT EXISTS idx_sms_log_user      ON sms_log(user_id);
-CREATE INDEX IF NOT EXISTS idx_mpesa_checkout    ON mpesa_transactions(checkout_request_id);
 
--- SMS Providers table
+-- ------------------------------------------------------------
+-- SMS PROVIDERS
+-- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sms_providers (
   id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   name        TEXT NOT NULL UNIQUE,
   label       TEXT NOT NULL,
   api_token   TEXT,
   sender_id   TEXT,
-  extra_config TEXT,         -- JSON for any extra fields
+  extra_config TEXT,
   is_active   INTEGER NOT NULL DEFAULT 0,
   is_default  INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- SMS Templates table
+-- ------------------------------------------------------------
+-- SMS TEMPLATES
+-- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sms_templates (
   id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   name        TEXT NOT NULL UNIQUE,
@@ -207,7 +213,7 @@ CREATE TABLE IF NOT EXISTS sms_templates (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Seed default provider
+-- Seed default providers
 INSERT OR IGNORE INTO sms_providers (name, label, is_active, is_default)
 VALUES ('talksasa', 'Talksasa', 1, 1);
 
@@ -216,18 +222,35 @@ VALUES ('africas_talking', 'Africa''s Talking', 0, 0);
 
 -- Seed default templates
 INSERT OR IGNORE INTO sms_templates (name, label, content, is_active) VALUES
-('session_started',   'Payment Confirmed',
+('session_started',    'Payment Confirmed',
  'Hi! You are now connected to [[company]]. Package: [[package]] ([[duration]]). Expires: [[expiry]]. Ref: [[receipt]]. Enjoy browsing!',
  1),
-('session_expiring',  'Session Expiring Soon',
+('session_expiring',   'Session Expiring Soon',
  'Hi! Your [[company]] [[package]] session expires in [[minutes]] mins. Renew at [[portal_url]] to stay connected.',
  1),
-('session_expired',   'Session Expired',
+('session_expired',    'Session Expired',
  'Your [[company]] [[package]] session has ended. Reconnect at [[portal_url]].',
  1),
-('voucher_redeemed',  'Voucher Redeemed',
+('voucher_redeemed',   'Voucher Redeemed',
  'Hi! Voucher redeemed on [[company]]. Package: [[package]] ([[duration]]). Expires: [[expiry]]. Enjoy browsing!',
  1),
-('custom',            'Custom Broadcast',
+('custom',             'Custom Broadcast',
  'Hi from [[company]]! [[message]]',
+ 1),
+('punchcard_progress', 'Punchcard Progress Reminder',
+ 'Hi! You have [[sessions_left]] session(s) to go before earning a FREE session on [[company]]. Keep it up!',
+ 1),
+('punchcard_milestone','Punchcard Free Session Earned',
+ 'Congrats! You have completed [[target]] sessions on [[company]]! You have earned a FREE [[package]] session. Voucher code: [[code]]. Valid until [[expiry]]. Enjoy!',
  1);
+
+-- ------------------------------------------------------------
+-- INDEXES
+-- ------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_sessions_user     ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status   ON sessions(status);
+CREATE INDEX IF NOT EXISTS idx_sessions_end_at   ON sessions(end_at);
+CREATE INDEX IF NOT EXISTS idx_vouchers_code     ON vouchers(code);
+CREATE INDEX IF NOT EXISTS idx_users_phone       ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_sms_log_user      ON sms_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_mpesa_checkout    ON mpesa_transactions(checkout_request_id);

@@ -70,3 +70,42 @@
 .generatedCode span { font-family: var(--font-mono); font-size: 13px; color: var(--text); letter-spacing: 1px; }
 .copyAllBtn { display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); padding: 11px; font-size: 13.5px; transition: border-color 0.15s; }
 .copyAllBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Expired row */
+.expiredRow { opacity: 0.55; }
+.expiredRow:hover { opacity: 0.8; }
+
+/* Expired badge */
+.badgeExpired { background: rgba(240,64,96,0.1); color: var(--red); border: 1px solid rgba(240,64,96,0.2); }
+
+/* Delete button */
+.deleteBtn {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+}
+.deleteBtn:hover { color: var(--red); background: rgba(240,64,96,0.08); }
+
+/* Delete selected button */
+.deleteSelectedBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(240,64,96,0.1);
+  border: 1px solid rgba(240,64,96,0.25);
+  border-radius: var(--radius);
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-left: auto;
+}
+.deleteSelectedBtn:hover { background: rgba(240,64,96,0.18); }

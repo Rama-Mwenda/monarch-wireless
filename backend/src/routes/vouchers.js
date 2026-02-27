@@ -14,11 +14,16 @@ function generateCode() {
 
 // GET /api/vouchers — list vouchers
 router.get('/', requireAuth, (req, res) => {
-  const { site_id, package_id, used } = req.query;
+  const { site_id, package_id, status } = req.query;
 
   let query = `
     SELECT v.*, p.name as package_name, p.price, p.duration_minutes,
-           u.phone as used_by_phone
+           u.phone as used_by_phone,
+           CASE
+             WHEN v.is_used = 1 THEN 'used'
+             WHEN v.expires_at IS NOT NULL AND v.expires_at < datetime('now') THEN 'expired'
+             ELSE 'available'
+           END as computed_status
     FROM vouchers v
     JOIN packages p ON v.package_id = p.id
     LEFT JOIN users u ON v.used_by = u.id
@@ -26,10 +31,11 @@ router.get('/', requireAuth, (req, res) => {
   `;
   const params = [];
 
-  if (site_id)     { query += ' AND v.site_id = ?'; params.push(site_id); }
-  if (package_id)  { query += ' AND v.package_id = ?'; params.push(package_id); }
-  if (used === 'true')  { query += ' AND v.is_used = 1'; }
-  if (used === 'false') { query += ' AND v.is_used = 0'; }
+  if (site_id)    { query += ' AND v.site_id = ?';    params.push(site_id); }
+  if (package_id) { query += ' AND v.package_id = ?'; params.push(package_id); }
+  if (status === 'used')      { query += ' AND v.is_used = 1'; }
+  if (status === 'available') { query += " AND v.is_used = 0 AND (v.expires_at IS NULL OR v.expires_at >= datetime('now'))"; }
+  if (status === 'expired')   { query += " AND v.is_used = 0 AND v.expires_at IS NOT NULL AND v.expires_at < datetime('now')"; }
 
   query += ' ORDER BY v.created_at DESC LIMIT 500';
 
@@ -111,15 +117,12 @@ router.post('/redeem', (req, res) => {
     db.prepare('INSERT INTO users (phone, mac_address) VALUES (?, ?)').run(phone, mac_address || null);
     user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
   } else if (mac_address) {
-    db.prepare("UPDATE users SET mac_address = ?, last_seen = datetime('now') WHERE id = ?")
+    db.prepare('UPDATE users SET mac_address = ?, last_seen = datetime("now") WHERE id = ?')
       .run(mac_address, user.id);
   }
 
   // Calculate session end time
   const endAt = new Date(Date.now() + voucher.duration_minutes * 60 * 1000).toISOString();
-
-  // Punch card logic — every 10 sessions = 1 free (tracked via punch_count)
-  const newPunchCount = (user.punch_count + 1) % 10;
 
   // Run everything in a transaction
   const activate = db.transaction(() => {
@@ -146,11 +149,10 @@ router.post('/redeem', (req, res) => {
         loyalty_points = ?,
         total_spent = total_spent + ?,
         total_sessions = total_sessions + 1,
-        punch_count = ?,
         tier = ?,
         last_seen = datetime('now')
       WHERE id = ?
-    `).run(newPoints, voucher.price, newPunchCount, newTier, user.id);
+    `).run(newPoints, voucher.price, newTier, user.id);
   });
 
   activate();
@@ -171,10 +173,47 @@ router.post('/redeem', (req, res) => {
       tier: updatedUser.tier,
       loyalty_points: updatedUser.loyalty_points,
       punch_count: updatedUser.punch_count,
-      free_session_earned: newPunchCount === 0 && user.punch_count !== 0,
     },
   });
 });
+
+
+// DELETE /api/vouchers/:id — delete a voucher (unused only)
+router.delete('/:id',
+  requireAuth,
+  requireRole('super_admin', 'site_manager'),
+  (req, res) => {
+    const voucher = db.prepare('SELECT * FROM vouchers WHERE id = ?').get(req.params.id);
+    if (!voucher) return res.status(404).json({ error: 'Voucher not found' });
+    if (voucher.is_used) return res.status(400).json({ error: 'Cannot delete a used voucher' });
+
+    db.prepare('DELETE FROM vouchers WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Voucher deleted' });
+  }
+);
+
+// DELETE /api/vouchers/bulk — delete multiple vouchers
+router.post('/bulk-delete',
+  requireAuth,
+  requireRole('super_admin', 'site_manager'),
+  (req, res) => {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: 'No ids provided' });
+
+    const deleteStmt = db.prepare('DELETE FROM vouchers WHERE id = ? AND is_used = 0');
+    const deleteMany = db.transaction(() => {
+      let deleted = 0;
+      for (const id of ids) {
+        const result = deleteStmt.run(id);
+        deleted += result.changes;
+      }
+      return deleted;
+    });
+
+    const deleted = deleteMany();
+    res.json({ deleted, message: `${deleted} voucher(s) deleted` });
+  }
+);
 
 // GET /api/vouchers/:code/check — check voucher validity
 router.get('/:code/check', (req, res) => {
@@ -196,8 +235,8 @@ router.get('/:code/check', (req, res) => {
 
 function calculateTier(totalSpent) {
   if (totalSpent >= 5000) return 'platinum';
-  if (totalSpent >= 3000) return 'gold';
-  if (totalSpent >= 1000)  return 'silver';
+  if (totalSpent >= 2000) return 'gold';
+  if (totalSpent >= 500)  return 'silver';
   return 'bronze';
 }
 

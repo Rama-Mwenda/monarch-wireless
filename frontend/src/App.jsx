@@ -9,7 +9,8 @@ import Users from './pages/Users';
 import Network from './pages/Network';
 import LiveClients from './pages/LiveClients';
 import Reports from './pages/Reports';
-import Sms from './pages/Sms';
+import Sms      from './pages/Sms';
+import Settings from './pages/Settings';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/users"           element={<Users />} />
             <Route path="/reports"         element={<Reports />} />
             <Route path="/sms"             element={<Sms />} />
+            <Route path="/settings"        element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

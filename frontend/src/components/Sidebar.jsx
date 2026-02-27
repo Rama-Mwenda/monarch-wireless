@@ -1,8 +1,9 @@
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Wifi, Package, Users,
-  Ticket, BarChart2, LogOut, Settings, MessageSquare
+  Ticket, BarChart2, LogOut, Settings as SettingsIcon, MessageSquare
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
@@ -14,6 +15,7 @@ const nav = [
   { to: '/users',     icon: Users,           label: 'Users'     },
   { to: '/reports',   icon: BarChart2,       label: 'Reports'   },
   { to: '/sms',       icon: MessageSquare,   label: 'SMS'       },
+  { to: '/settings',  icon: SettingsIcon,    label: 'Settings'  },
 ];
 
 export default function Sidebar() {
@@ -36,7 +38,7 @@ export default function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {nav.map(({ to, icon: Icon, label }) => (
+        {nav.map(({ to, icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -45,7 +47,7 @@ export default function Sidebar() {
               `${styles.navItem} ${isActive ? styles.active : ''}`
             }
           >
-            <Icon size={16} strokeWidth={1.8} />
+            {React.createElement(icon, { size: 16, strokeWidth: 1.8 })}
             <span>{label}</span>
           </NavLink>
         ))}

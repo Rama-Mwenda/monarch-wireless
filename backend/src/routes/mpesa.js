@@ -2,13 +2,15 @@ const express = require('express');
 const db      = require('../db');
 const mpesa   = require('../services/mpesa');
 const sms     = require('../services/sms');
+const macAuth    = require('../helpers/mac-auth-helper');
+const punchcard  = require('../helpers/punchcard');
 
 const router = express.Router();
 
 // ── POST /api/mpesa/stk-push ─────────────────────────────────
 // Initiate payment — called from captive portal or admin dashboard
 router.post('/stk-push', async (req, res) => {
-  const { phone, package_id } = req.body;
+  const { phone, package_id, mac, ap_mac, ssid_name, radio_id } = req.body;
 
   if (!phone || !package_id) {
     return res.status(400).json({ error: 'phone and package_id are required' });
@@ -42,6 +44,15 @@ router.post('/stk-push', async (req, res) => {
     }
 
     // Save pending transaction
+    // Store MAC info so callback can authorize
+    // (columns added by device-limit-migration.sql)
+    try {
+      db.prepare('ALTER TABLE mpesa_transactions ADD COLUMN client_mac TEXT').run();
+      db.prepare('ALTER TABLE mpesa_transactions ADD COLUMN ap_mac TEXT').run();
+      db.prepare('ALTER TABLE mpesa_transactions ADD COLUMN ssid_name TEXT').run();
+      db.prepare('ALTER TABLE mpesa_transactions ADD COLUMN radio_id INTEGER').run();
+    } catch(e) { /* columns already exist */ }
+
     db.prepare(`
       INSERT INTO mpesa_transactions
         (checkout_request_id, merchant_request_id, phone, amount, package_id, site_id, status)
@@ -197,6 +208,27 @@ router.post('/callback', async (req, res) => {
       `).run(newSpent, newSessions, newPoints, newPunch, newTier, user.id);
 
       console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
+
+      // Authorize MAC with Omada (non-blocking)
+      // clientMac stored on transaction from STK push initiation
+      if (txn.client_mac) {
+        macAuth.authorizeSession({
+          sessionId:       sessionId,
+          userId:          user.id,
+          packageId:       pkg.id,
+          clientMac:       txn.client_mac,
+          apMac:           txn.ap_mac,
+          ssidName:        txn.ssid_name,
+          radioId:         txn.radio_id,
+          site:            process.env.OMADA_SITE_NAME,
+          durationMinutes: pkg.duration_minutes,
+        }).catch(e => console.error('MAC auth error:', e.message));
+      }
+
+      // Punchcard check (non-blocking)
+      if (txn.phone && !txn.phone.startsWith('mac:')) {
+        punchcard.checkPunchcard(user.id, txn.phone).catch(console.error);
+      }
 
       // Send confirmation SMS (non-blocking)
       if (!txn.phone.startsWith('mac:')) {

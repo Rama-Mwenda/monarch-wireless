@@ -22,7 +22,7 @@ router.post('/broadcast', requireAuth, async (req, res) => {
   const { message, tier } = req.body;
   if (!message) return res.status(400).json({ error: 'Message required' });
 
-  let query = 'SELECT id, phone FROM users WHERE opted_in_sms = 1 AND is_active = 1 AND phone NOT LIKE "mac:%"';
+  let query = "SELECT id, phone FROM users WHERE opted_in_sms = 1 AND is_active = 1 AND phone NOT LIKE 'mac:%'";
   const params = [];
   if (tier) { query += ' AND tier = ?'; params.push(tier); }
 
