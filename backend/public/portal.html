@@ -809,15 +809,42 @@
   window.addEventListener('DOMContentLoaded', loadPackages);
 
   async function loadPackages() {
+    const grid = document.getElementById('pkg-grid');
+
+    if (window.location.protocol === 'file:') {
+      grid.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;line-height:1.8">⚠️ Open via backend: http://localhost:3000/portal</div>';
+      return;
+    }
+
     try {
-      const res  = await fetch(`/portal/packages`);
+      const url = `/portal/packages`;
+      console.log('[Portal] Fetching:', url);
+      const res  = await fetch(url);
+      console.log('[Portal] Response status:', res.status);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[Portal] Error body:', text);
+        throw new Error(`HTTP ${res.status}: ${text.slice(0,100)}`);
+      }
       const data = await res.json();
-      packages   = Array.isArray(data) ? data : (data.packages || []);
-      packages   = packages.filter(p => p.is_active);
+      console.log('[Portal] Packages received:', data);
+      packages = Array.isArray(data) ? data : (data.packages || []);
+      packages = packages.filter(p => p.is_active !== 0);
+      if (!packages.length) {
+        grid.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:12px;text-align:center">No packages available. Add packages in the admin dashboard.</div>';
+        return;
+      }
       renderPackages();
     } catch(e) {
-      document.getElementById('pkg-grid').innerHTML =
-        '<div style="color:var(--red);font-size:13px;padding:12px">Could not load packages. Please refresh.</div>';
+      console.error('[Portal] loadPackages error:', e);
+      grid.innerHTML =
+        `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;line-height:2">
+          ⚠️ Could not load packages<br>
+          <span style="color:var(--text3);font-size:10px">${e.message}</span><br>
+          <button onclick="loadPackages()" style="margin-top:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px">
+            Retry
+          </button>
+        </div>`;
     }
   }
 
@@ -900,7 +927,7 @@
     startCountdown();
 
     try {
-      const res = await fetch(`/api/mpesa/stk-push`, {
+      const res = await fetch(`${window.location.origin}/api/mpesa/stk-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, package_id: selectedPkg.id, ...getOmadaParams() })
@@ -927,7 +954,7 @@
   function startPolling() {
     pollTimer = setInterval(async () => {
       try {
-        const res  = await fetch(`/api/mpesa/status/${checkoutId}`);
+        const res  = await fetch(`${window.location.origin}/api/mpesa/status/${checkoutId}`);
         const data = await res.json();
 
         if (data.status === 'success') {
@@ -974,7 +1001,7 @@
 
   async function lookupVoucher(code) {
     try {
-      const res  = await fetch(`/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
+      const res  = await fetch(`${window.location.origin}/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
       const data = await res.json();
       if (res.ok && data.voucher) {
         voucherData = data.voucher;
@@ -997,7 +1024,7 @@
     hideError('voucher');
 
     try {
-      const res  = await fetch(`/portal/vouchers/redeem`, {
+      const res  = await fetch(`${window.location.origin}/portal/vouchers/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, ...getOmadaParams() })

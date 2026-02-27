@@ -14,6 +14,7 @@ router.get('/', (req, res) => {
 
 // ── GET /portal/packages — PUBLIC, no auth needed
 router.get('/packages', (req, res) => {
+  try {
   const packages = db.prepare(`
     SELECT
       p.id, p.name, p.price, p.duration_minutes, p.data_cap_mb, p.is_active, p.is_promo,
@@ -26,6 +27,8 @@ router.get('/packages', (req, res) => {
     ORDER BY p.price ASC
   `).all();
 
+  if (!packages.length) return res.json([]);
+
   // Calculate revenue share and mark most popular
   const totalRevenue = packages.reduce((sum, p) => sum + p.total_revenue, 0);
   const withShare = packages.map(p => ({
@@ -34,13 +37,17 @@ router.get('/packages', (req, res) => {
   }));
 
   // Most popular = highest revenue share, only badge if >25% share
-  const maxRevenue = Math.max(...withShare.map(p => p.total_revenue));
+  const maxRevenue = withShare.length ? Math.max(...withShare.map(p => p.total_revenue)) : 0;
   const result = withShare.map(p => ({
     ...p,
     is_popular: maxRevenue > 0 && p.total_revenue === maxRevenue && p.revenue_share >= 0.25,
   }));
 
   res.json(result);
+  } catch(err) {
+    console.error('Portal packages error:', err.message);
+    res.status(500).json({ error: 'Failed to load packages', detail: err.message });
+  }
 });
 
 // ── GET /portal/vouchers/lookup?code=MW-XXXX-XXXX — PUBLIC

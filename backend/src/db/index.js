@@ -17,6 +17,7 @@ const db = new Database(DB_PATH);
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('synchronous = NORMAL');
 
 // Run schema
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
