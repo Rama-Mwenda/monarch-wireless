@@ -136,3 +136,186 @@
 
 .saveBtn { display: flex; align-items: center; gap: 6px; background: var(--accent); color: #000; border: none; border-radius: var(--radius); padding: 9px 20px; font-family: var(--font-display); font-size: 13px; font-weight: 700; transition: opacity 0.15s; }
 .saveBtn:hover { opacity: 0.9; }
+
+/* ── PRINT STYLES ─────────────────────────────────────────── */
+@media print {
+  /* Hide everything on the page except the report */
+  body > * { display: none !important; }
+  #root > * { display: none !important; }
+
+  /* Show only the report div */
+  #report {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 28px 32px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #080c12 !important;
+    color: #dde6f0 !important;
+    overflow: visible !important;
+    z-index: 99999 !important;
+    gap: 20px !important;
+  }
+
+  /* Keep dark theme on all cards */
+  #report .statCard,
+  #report .chartSection,
+  #report .pnlSection,
+  #report .pkgSection {
+    background: #0f1620 !important;
+    border: 1px solid #1e2d45 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #report .allTimeStat {
+    background: #080c12 !important;
+    border: 1px solid #1e2d45 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide cost settings panel and header actions from print */
+  .costsPanel { display: none !important; }
+  .header { display: none !important; }
+  .page { padding: 0 !important; }
+}
+
+/* ── Expense Panel ───────────────────────────────────────────── */
+.expenseList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.expenseRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s;
+}
+.expenseRow:hover { border-color: var(--border2); }
+
+.expenseInactive { opacity: 0.45; }
+
+.expenseCatIcon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+
+.expenseInfo { flex: 1; min-width: 0; }
+.expenseName { font-size: 13px; font-weight: 600; color: var(--text); }
+.expenseMeta { font-size: 11px; color: var(--text2); font-family: var(--font-mono); margin-top: 2px; }
+
+.expenseAmount { text-align: right; }
+.expenseAmountMain { font-size: 13px; font-weight: 600; font-family: var(--font-mono); color: var(--text); }
+.expenseAmountSub  { font-size: 10px; color: var(--text2); font-family: var(--font-mono); margin-top: 2px; }
+
+.expenseActions { display: flex; gap: 4px; }
+.expenseEditBtn, .expenseDeleteBtn {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.expenseEditBtn:hover   { border-color: var(--accent); color: var(--accent); background: rgba(240,165,0,0.08); }
+.expenseDeleteBtn:hover { border-color: var(--red);    color: var(--red);    background: rgba(240,64,96,0.08); }
+
+/* Editing state */
+.expenseRowEditing {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.expenseEditGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.expenseEditField { display: flex; flex-direction: column; gap: 4px; }
+.expenseEditLabel { font-size: 10px; font-family: var(--font-mono); color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; }
+.expenseEditInput, .expenseEditSelect {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.expenseEditInput:focus, .expenseEditSelect:focus { border-color: var(--accent); }
+
+.expenseEditActions { display: flex; gap: 8px; }
+
+.expenseSaveBtn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 6px;
+  background: var(--accent); color: #000;
+  border: none; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.expenseSaveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.expenseCancelBtn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 6px;
+  background: var(--surface2); color: var(--text2);
+  border: 1px solid var(--border); font-size: 12px; cursor: pointer;
+}
+
+/* Add expense */
+.addExpenseBtn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.addExpenseBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.addExpenseForm {
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface2);
+}
+.addExpenseTitle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  margin-bottom: 12px;
+}

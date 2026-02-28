@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, UserPlus, Trash2, KeyRound,
-         Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+         Eye, EyeOff, CheckCircle, AlertCircle, CreditCard,
+         Wifi, FlaskConical } from 'lucide-react';
 import api from '../services/api';
 import styles from './Settings.module.css';
 
@@ -55,6 +56,25 @@ export default function Settings() {
 
   const isSuperAdmin = admin?.role === 'super_admin';
 
+  // Payment config state
+  const [payConfig,    setPayConfig]    = useState([]);
+  const [payEdits,     setPayEdits]     = useState({});
+  const [paySaving,    setPaySaving]    = useState(false);
+  const [payTesting,   setPayTesting]   = useState(false);
+  const [showSecrets,  setShowSecrets]  = useState({});
+
+  const loadPaymentConfig = () => {
+    api.get('/payment/config')
+      .then(res => {
+        setPayConfig(res.data.config || []);
+        // Populate edits with current values
+        const edits = {};
+        (res.data.config || []).forEach(c => { edits[c.key] = c.value || ''; });
+        setPayEdits(edits);
+      })
+      .catch(console.error);
+  };
+
   const loadAdmins = () => {
     api.get('/auth/admins')
       .then(res => setAdmins(res.data))
@@ -62,7 +82,10 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    if (isSuperAdmin) loadAdmins();
+    if (isSuperAdmin) {
+      loadAdmins();
+      loadPaymentConfig();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleChangePassword(e) {
@@ -111,11 +134,39 @@ export default function Settings() {
     }
   }
 
+  async function handleSavePayment() {
+    setPaySaving(true);
+    try {
+      const updates = Object.entries(payEdits).map(([key, value]) => ({ key, value }));
+      await api.put('/payment/config', { updates });
+      showToast('M-Pesa config saved ✅', 'success');
+      loadPaymentConfig();
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Failed to save config', 'error');
+    }
+    setPaySaving(false);
+  }
+
+  async function handleTestConnection() {
+    setPayTesting(true);
+    try {
+      // Save first so test uses latest values
+      const updates = Object.entries(payEdits).map(([key, value]) => ({ key, value }));
+      await api.put('/payment/config', { updates });
+      const res = await api.post('/payment/test-connection');
+      showToast(res.data.message, 'success');
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Connection test failed', 'error');
+    }
+    setPayTesting(false);
+  }
+
   function showToast(msg, type) { setToast({ msg, type }); }
 
   const tabs = [
     { key: 'password', label: 'Change Password', icon: KeyRound },
-    ...(isSuperAdmin ? [{ key: 'admins', label: 'Admin Accounts', icon: ShieldCheck }] : []),
+    ...(isSuperAdmin ? [{ key: 'admins',  label: 'Admin Accounts', icon: ShieldCheck }] : []),
+    ...(isSuperAdmin ? [{ key: 'payment', label: 'M-Pesa Config',  icon: CreditCard  }] : []),
   ];
 
   return (
@@ -187,6 +238,83 @@ export default function Settings() {
               <KeyRound size={13}/>
               {pwSaving ? 'Updating…' : 'Update Password'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── M-PESA CONFIG ── */}
+      {tab === 'payment' && isSuperAdmin && (
+        <div className={styles.section}>
+          <div className={styles.sectionDesc}>
+            Configure M-Pesa Daraja API credentials. Changes take effect immediately — no restart required.
+          </div>
+
+          <div className={styles.formCard}>
+            <div className={styles.cardTitle}><CreditCard size={14}/> M-Pesa Daraja API</div>
+
+            {/* Environment toggle */}
+            {payConfig.filter(c => c.key === 'mpesa_env').map(c => (
+              <div key={c.key} className={styles.formRow}>
+                <label className={styles.formLabel}>{c.label}</label>
+                <select
+                  className={styles.formSelect}
+                  value={payEdits[c.key] || 'sandbox'}
+                  onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}>
+                  <option value="sandbox">Sandbox (testing)</option>
+                  <option value="production">Production (live)</option>
+                </select>
+                <div className={styles.fieldDesc}>{c.description}</div>
+              </div>
+            ))}
+
+            {/* Shortcode + Callback URL — not secret */}
+            <div className={styles.twoCol}>
+              {payConfig.filter(c => ['mpesa_shortcode','mpesa_callback_url'].includes(c.key)).map(c => (
+                <div key={c.key} className={styles.formRow}>
+                  <label className={styles.formLabel}>{c.label}</label>
+                  <input
+                    className={styles.formInput}
+                    type="text"
+                    value={payEdits[c.key] || ''}
+                    onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}
+                    placeholder={c.description}
+                  />
+                  <div className={styles.fieldDesc}>{c.description}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Secret fields — Consumer Key, Secret, Passkey */}
+            {payConfig.filter(c => c.is_secret && c.key !== 'mpesa_env').map(c => (
+              <div key={c.key} className={styles.formRow}>
+                <label className={styles.formLabel}>{c.label}</label>
+                <div className={styles.pwRow}>
+                  <input
+                    className={styles.formInput}
+                    type={showSecrets[c.key] ? 'text' : 'password'}
+                    value={payEdits[c.key] || ''}
+                    onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}
+                    placeholder={c._has_value ? 'Leave blank to keep existing' : c.description}
+                  />
+                  <button type="button" className={styles.eyeBtn}
+                    onClick={() => setShowSecrets(s => ({...s, [c.key]: !s[c.key]}))}>
+                    {showSecrets[c.key] ? <EyeOff size={14}/> : <Eye size={14}/>}
+                  </button>
+                </div>
+                <div className={styles.fieldDesc}>{c.description}</div>
+              </div>
+            ))}
+
+            <div className={styles.btnRow}>
+              <button className={styles.testBtn} onClick={handleTestConnection} disabled={payTesting}>
+                <FlaskConical size={13}/>
+                {payTesting ? 'Testing…' : 'Test Connection'}
+              </button>
+              <button className={styles.saveBtn} onClick={handleSavePayment} disabled={paySaving}>
+                <CreditCard size={13}/>
+                {paySaving ? 'Saving…' : 'Save Config'}
+              </button>
+            </div>
           </div>
         </div>
       )}

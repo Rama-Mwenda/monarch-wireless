@@ -7,18 +7,30 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 
 // ── Security middleware ──────────────────────────────────────
-// Disable CSP for the captive portal — it uses inline scripts and runs over HTTP
+// Portal needs relaxed CSP (inline scripts + onclick handlers + plain HTTP)
+// All API routes get full strict helmet
 app.use((req, res, next) => {
   if (req.path.startsWith('/portal')) {
-    // Portal needs inline scripts + works over plain HTTP (captive portal environment)
     return helmet({
-      contentSecurityPolicy: false,
-      crossOriginOpenerPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc:      ["'self'"],
+          scriptSrc:       ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
+          scriptSrcAttr:   ["'unsafe-inline'"],
+          styleSrc:        ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc:         ["'self'", 'https://fonts.gstatic.com'],
+          imgSrc:          ["'self'", 'data:'],
+          connectSrc:      ["'self'"],
+          frameAncestors:       ["'none'"],
+          upgradeInsecureRequests: [],  // don't force HTTPS on captive portal
+        },
+      },
+      crossOriginOpenerPolicy:  false,
       crossOriginEmbedderPolicy: false,
     })(req, res, next);
   }
-  // Full helmet for all other routes
-  helmet()(req, res, next);
+  // Full strict helmet for all API routes
+  return helmet()(req, res, next);
 });
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -47,6 +59,7 @@ app.use('/api/users',     require('./routes/users'));
 app.use('/api/network',   require('./routes/network'));
 app.use('/api/mpesa',     require('./routes/mpesa'));
 app.use('/api/sms',       require('./routes/sms-settings'));
+app.use('/api/payment',    require('./routes/payment-settings'));
 app.use('/portal',        require('./routes/portal'));
 
 // ── Health check ─────────────────────────────────────────────

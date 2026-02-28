@@ -17,7 +17,6 @@ const db = new Database(DB_PATH);
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
-db.pragma('synchronous = NORMAL');
 
 // Run schema
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
@@ -41,6 +40,52 @@ safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN client_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ap_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ssid_name TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN radio_id INTEGER');
+
+// Ensure expenses table exists
+db.exec(`
+  CREATE TABLE IF NOT EXISTS expenses (
+    id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    label        TEXT NOT NULL,
+    amount       REAL NOT NULL DEFAULT 0,
+    category     TEXT NOT NULL DEFAULT 'other',
+    is_monthly   INTEGER NOT NULL DEFAULT 1,
+    amort_months INTEGER,
+    is_active    INTEGER NOT NULL DEFAULT 1,
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now'))
+  );
+`);
+const seedExpense = db.prepare(`
+  INSERT OR IGNORE INTO expenses (id, label, amount, category, is_monthly, amort_months)
+  VALUES (?, ?, 0, ?, ?, ?)
+`);
+seedExpense.run('isp-default', 'ISP / Internet',   'isp',      1, null);
+seedExpense.run('hw-default',  'Hardware (Omada)', 'hardware', 0, 24);
+seedExpense.run('vps-default', 'VPS Hosting',      'vps',      1, null);
+
+// Ensure payment_config table exists (for installs before this feature)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payment_config (
+    id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    key         TEXT NOT NULL UNIQUE,
+    value       TEXT,
+    label       TEXT NOT NULL,
+    description TEXT,
+    is_secret   INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT DEFAULT (datetime('now'))
+  );
+`);
+const seedPaymentConfig = db.prepare(`
+  INSERT OR IGNORE INTO payment_config (key, label, description, is_secret) VALUES (?, ?, ?, ?)
+`);
+[
+  ['mpesa_env',             'Environment',          'sandbox or production',          0],
+  ['mpesa_consumer_key',    'Consumer Key',         'Daraja API Consumer Key',        1],
+  ['mpesa_consumer_secret', 'Consumer Secret',      'Daraja API Consumer Secret',     1],
+  ['mpesa_shortcode',       'Shortcode',            'Till or Paybill number',         0],
+  ['mpesa_passkey',         'Passkey',              'Lipa Na M-Pesa Online Passkey',  1],
+  ['mpesa_callback_url',    'Callback URL',         'Publicly accessible HTTPS URL',  0],
+].forEach(([key, label, desc, secret]) => seedPaymentConfig.run(key, label, desc, secret));
 
 // Seed default data if fresh database
 function seedDefaults() {

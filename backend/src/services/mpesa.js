@@ -1,29 +1,50 @@
 const axios = require('axios');
-
-const ENV        = process.env.MPESA_ENV || 'sandbox';
-const BASE_URL   = ENV === 'production'
-  ? 'https://api.safaricom.co.ke'
-  : 'https://sandbox.safaricom.co.ke';
-
-const CONSUMER_KEY    = process.env.MPESA_CONSUMER_KEY;
-const CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET;
-const SHORTCODE       = process.env.MPESA_SHORTCODE || '174379';
-const PASSKEY         = process.env.MPESA_PASSKEY;
-const CALLBACK_URL    = process.env.MPESA_CALLBACK_URL;
+const path  = require('path');
 
 let tokenCache = null;
 let tokenExpiry = 0;
 
+// ── Dynamic config — reads from DB first, falls back to .env ──
+function getCfg() {
+  try {
+    const db  = require('../db');
+    const rows = db.prepare('SELECT key, value FROM payment_config').all();
+    const map  = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    return {
+      env:            map.mpesa_env            || process.env.MPESA_ENV            || 'sandbox',
+      consumerKey:    map.mpesa_consumer_key    || process.env.MPESA_CONSUMER_KEY,
+      consumerSecret: map.mpesa_consumer_secret || process.env.MPESA_CONSUMER_SECRET,
+      shortcode:      map.mpesa_shortcode       || process.env.MPESA_SHORTCODE      || '174379',
+      passkey:        map.mpesa_passkey         || process.env.MPESA_PASSKEY,
+      callbackUrl:    map.mpesa_callback_url    || process.env.MPESA_CALLBACK_URL,
+    };
+  } catch {
+    // DB not ready yet — fall back to env vars
+    return {
+      env:            process.env.MPESA_ENV            || 'sandbox',
+      consumerKey:    process.env.MPESA_CONSUMER_KEY,
+      consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+      shortcode:      process.env.MPESA_SHORTCODE       || '174379',
+      passkey:        process.env.MPESA_PASSKEY,
+      callbackUrl:    process.env.MPESA_CALLBACK_URL,
+    };
+  }
+}
+
 // ── OAuth token ───────────────────────────────────────────────
 async function getToken() {
   if (tokenCache && Date.now() < tokenExpiry - 30000) return tokenCache;
-  const creds = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64');
-  const res = await axios.get(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
+  const { env, consumerKey, consumerSecret } = getCfg();
+  const baseUrl = env === 'production'
+    ? 'https://api.safaricom.co.ke'
+    : 'https://sandbox.safaricom.co.ke';
+  const creds = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+  const res = await axios.get(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
     headers: { Authorization: `Basic ${creds}` },
   });
   tokenCache  = res.data.access_token;
   tokenExpiry = Date.now() + (res.data.expires_in || 3600) * 1000;
-  console.log('M-Pesa token obtained');
+  console.log(`M-Pesa token obtained (${env})`);
   return tokenCache;
 }
 
@@ -32,36 +53,42 @@ function getTimestamp() {
   return new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
 }
 function getPassword() {
+  const { shortcode, passkey } = getCfg();
   const timestamp = getTimestamp();
   return {
-    password:  Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64'),
+    password:  Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64'),
     timestamp,
   };
 }
 
 // ── STK Push ──────────────────────────────────────────────────
 async function stkPush({ phone, amount, packageName, packageId, accountRef }) {
-  const token = await getToken();
+  const { env, shortcode, callbackUrl } = getCfg();
+  const baseUrl = env === 'production'
+    ? 'https://api.safaricom.co.ke'
+    : 'https://sandbox.safaricom.co.ke';
+
+  const token    = await getToken();
   const { password, timestamp } = getPassword();
   const normPhone = normalisePhone(phone);
 
   const payload = {
-    BusinessShortCode: SHORTCODE,
+    BusinessShortCode: shortcode,
     Password:          password,
     Timestamp:         timestamp,
     TransactionType:   'CustomerPayBillOnline',
     Amount:            Math.ceil(amount),
     PartyA:            normPhone,
-    PartyB:            SHORTCODE,
+    PartyB:            shortcode,
     PhoneNumber:       normPhone,
-    CallBackURL:       CALLBACK_URL,
+    CallBackURL:       callbackUrl,
     AccountReference:  accountRef || 'MonarchWifi',
     TransactionDesc:   packageName || 'WiFi Access',
   };
 
   console.log('STK Push payload:', JSON.stringify(payload, null, 2));
   const res = await axios.post(
-    `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
+    `${baseUrl}/mpesa/stkpush/v1/processrequest`,
     payload,
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -71,12 +98,17 @@ async function stkPush({ phone, amount, packageName, packageId, accountRef }) {
 
 // ── STK Query ─────────────────────────────────────────────────
 async function stkQuery(checkoutRequestId) {
+  const { env, shortcode } = getCfg();
+  const baseUrl = env === 'production'
+    ? 'https://api.safaricom.co.ke'
+    : 'https://sandbox.safaricom.co.ke';
+
   const token = await getToken();
   const { password, timestamp } = getPassword();
   const res = await axios.post(
-    `${BASE_URL}/mpesa/stkpushquery/v1/query`,
+    `${baseUrl}/mpesa/stkpushquery/v1/query`,
     {
-      BusinessShortCode: SHORTCODE,
+      BusinessShortCode: shortcode,
       Password:          password,
       Timestamp:         timestamp,
       CheckoutRequestID: checkoutRequestId,
@@ -118,4 +150,9 @@ function normalisePhone(phone) {
   return p;
 }
 
-module.exports = { getToken, stkPush, stkQuery, parseCallback, normalisePhone };
+function clearTokenCache() {
+  tokenCache  = null;
+  tokenExpiry = 0;
+}
+
+module.exports = { getToken, stkPush, stkQuery, parseCallback, normalisePhone, clearTokenCache };
