@@ -40,6 +40,9 @@ safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN client_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ap_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ssid_name TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN radio_id INTEGER');
+safeAlter('ALTER TABLE admins ADD COLUMN reset_token TEXT');
+safeAlter('ALTER TABLE admins ADD COLUMN reset_token_expires TEXT');
+safeAlter('ALTER TABLE admins ADD COLUMN phone TEXT');
 
 // Ensure expenses table exists
 db.exec(`
@@ -86,6 +89,28 @@ const seedPaymentConfig = db.prepare(`
   ['mpesa_passkey',         'Passkey',              'Lipa Na M-Pesa Online Passkey',  1],
   ['mpesa_callback_url',    'Callback URL',         'Publicly accessible HTTPS URL',  0],
 ].forEach(([key, label, desc, secret]) => seedPaymentConfig.run(key, label, desc, secret));
+
+// Seed SMTP config keys — INSERT OR IGNORE so existing values are never overwritten
+[
+  ['smtp_host', 'SMTP Host',     'e.g. smtp.gmail.com',                 0],
+  ['smtp_port', 'SMTP Port',     '587 for TLS, 465 for SSL',            0],
+  ['smtp_user', 'SMTP Username', 'Your email address',                  0],
+  ['smtp_pass', 'SMTP Password', 'App password (not account password)', 1],
+  ['smtp_from', 'From Name',     'Sender name e.g. Monarch Wireless',   0],
+].forEach(([key, label, desc, secret]) => seedPaymentConfig.run(key, label, desc, secret));
+
+// Also ensure smtp rows exist for existing databases (runs every boot safely)
+const ensureSmtp = db.prepare(`
+  INSERT OR IGNORE INTO payment_config (key, label, description, is_secret)
+  VALUES (?, ?, ?, ?)
+`);
+[
+  ['smtp_host', 'SMTP Host',     'e.g. smtp.gmail.com',                 0],
+  ['smtp_port', 'SMTP Port',     '587 for TLS, 465 for SSL',            0],
+  ['smtp_user', 'SMTP Username', 'Your email address',                  0],
+  ['smtp_pass', 'SMTP Password', 'App password (not account password)', 1],
+  ['smtp_from', 'From Name',     'Sender name e.g. Monarch Wireless',   0],
+].forEach(([key, label, desc, secret]) => ensureSmtp.run(key, label, desc, secret));
 
 // Seed default data if fresh database
 function seedDefaults() {

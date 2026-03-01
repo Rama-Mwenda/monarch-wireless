@@ -10,14 +10,18 @@ import Network from './pages/Network';
 import LiveClients from './pages/LiveClients';
 import Reports from './pages/Reports';
 import Sms      from './pages/Sms';
-import Settings from './pages/Settings';
+import Settings       from './pages/Settings';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login"           element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password"  element={<ResetPassword />} />
           <Route element={<Layout />}>
             <Route path="/"                element={<Dashboard />} />
             <Route path="/network"         element={<Network />} />

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, UserPlus, Trash2, KeyRound,
          Eye, EyeOff, CheckCircle, AlertCircle, CreditCard,
-         Wifi, FlaskConical } from 'lucide-react';
+         Wifi, FlaskConical, Mail, Send } from 'lucide-react';
 import api from '../services/api';
 import styles from './Settings.module.css';
 
@@ -56,6 +56,14 @@ export default function Settings() {
 
   const isSuperAdmin = admin?.role === 'super_admin';
 
+  // SMTP config state
+  const [smtpConfig,   setSmtpConfig]   = useState([]);
+  const [smtpEdits,    setSmtpEdits]    = useState({});
+  const [smtpSaving,   setSmtpSaving]   = useState(false);
+  const [smtpTesting,  setSmtpTesting]  = useState(false);
+  const [testEmail,    setTestEmail]    = useState('');
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+
   // Payment config state
   const [payConfig,    setPayConfig]    = useState([]);
   const [payEdits,     setPayEdits]     = useState({});
@@ -66,11 +74,19 @@ export default function Settings() {
   const loadPaymentConfig = () => {
     api.get('/payment/config')
       .then(res => {
-        setPayConfig(res.data.config || []);
-        // Populate edits with current values
-        const edits = {};
-        (res.data.config || []).forEach(c => { edits[c.key] = c.value || ''; });
-        setPayEdits(edits);
+        const all = res.data.config || [];
+        const pay  = all.filter(c => c.key.startsWith('mpesa_'));
+        const smtp = all.filter(c => c.key.startsWith('smtp_'));
+
+        setPayConfig(pay);
+        const payEditsNew = {};
+        pay.forEach(c => { payEditsNew[c.key] = c.value || ''; });
+        setPayEdits(payEditsNew);
+
+        setSmtpConfig(smtp);
+        const smtpEditsNew = {};
+        smtp.forEach(c => { smtpEditsNew[c.key] = c.value || ''; });
+        setSmtpEdits(smtpEditsNew);
       })
       .catch(console.error);
   };
@@ -134,6 +150,33 @@ export default function Settings() {
     }
   }
 
+  async function handleSaveSmtp() {
+    setSmtpSaving(true);
+    try {
+      const updates = Object.entries(smtpEdits).map(([key, value]) => ({ key, value }));
+      await api.put('/payment/config', { updates });
+      showToast('Email config saved ✅', 'success');
+      loadPaymentConfig();
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Failed to save SMTP config', 'error');
+    }
+    setSmtpSaving(false);
+  }
+
+  async function handleTestEmail() {
+    if (!testEmail) return showToast('Enter a test email address', 'error');
+    setSmtpTesting(true);
+    try {
+      const updates = Object.entries(smtpEdits).map(([key, value]) => ({ key, value }));
+      await api.put('/payment/config', { updates });
+      await api.post('/auth/test-email', { to: testEmail });
+      showToast(`Test email sent to ${testEmail} ✅`, 'success');
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Test email failed', 'error');
+    }
+    setSmtpTesting(false);
+  }
+
   async function handleSavePayment() {
     setPaySaving(true);
     try {
@@ -167,6 +210,7 @@ export default function Settings() {
     { key: 'password', label: 'Change Password', icon: KeyRound },
     ...(isSuperAdmin ? [{ key: 'admins',  label: 'Admin Accounts', icon: ShieldCheck }] : []),
     ...(isSuperAdmin ? [{ key: 'payment', label: 'M-Pesa Config',  icon: CreditCard  }] : []),
+    ...(isSuperAdmin ? [{ key: 'email',   label: 'Email Config',   icon: Mail        }] : []),
   ];
 
   return (
@@ -238,6 +282,86 @@ export default function Settings() {
               <KeyRound size={13}/>
               {pwSaving ? 'Updating…' : 'Update Password'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── EMAIL CONFIG ── */}
+      {tab === 'email' && isSuperAdmin && (
+        <div className={styles.section}>
+          <div className={styles.sectionDesc}>
+            Configure SMTP email for password reset links. Gmail recommended — use an App Password, not your account password.
+          </div>
+          <div className={styles.formCard}>
+            <div className={styles.cardTitle}><Mail size={14}/> SMTP Email Settings</div>
+
+            <div className={styles.twoCol}>
+              {smtpConfig.filter(c => ['smtp_host','smtp_port','smtp_user','smtp_from'].includes(c.key)).map(c => (
+                <div key={c.key} className={styles.formRow}>
+                  <label className={styles.formLabel}>{c.label}</label>
+                  <input className={styles.formInput} type="text"
+                    value={smtpEdits[c.key] || ''}
+                    onChange={e => setSmtpEdits(f => ({...f, [c.key]: e.target.value}))}
+                    placeholder={c.description}/>
+                  <div className={styles.fieldDesc}>{c.description}</div>
+                </div>
+              ))}
+            </div>
+
+            {smtpConfig.filter(c => c.key === 'smtp_pass').map(c => (
+              <div key={c.key} className={styles.formRow}>
+                <label className={styles.formLabel}>{c.label}</label>
+                <div className={styles.pwRow}>
+                  <input className={styles.formInput}
+                    type={showSmtpPass ? 'text' : 'password'}
+                    value={smtpEdits[c.key] || ''}
+                    onChange={e => setSmtpEdits(f => ({...f, [c.key]: e.target.value}))}
+                    placeholder={c._has_value ? 'Leave blank to keep existing' : c.description}/>
+                  <button type="button" className={styles.eyeBtn}
+                    onClick={() => setShowSmtpPass(s => !s)}>
+                    {showSmtpPass ? <EyeOff size={14}/> : <Eye size={14}/>}
+                  </button>
+                </div>
+                <div className={styles.fieldDesc}>{c.description}</div>
+              </div>
+            ))}
+
+            <div className={styles.formRow}>
+              <label className={styles.formLabel}>Send Test Email To</label>
+              <div className={styles.pwRow}>
+                <input className={styles.formInput} type="email"
+                  value={testEmail}
+                  onChange={e => setTestEmail(e.target.value)}
+                  placeholder="your@email.com"/>
+                <button className={styles.testBtn} onClick={handleTestEmail} disabled={smtpTesting}>
+                  <Send size={13}/> {smtpTesting ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+            </div>
+
+            <button className={styles.saveBtn} onClick={handleSaveSmtp} disabled={smtpSaving}>
+              <Mail size={13}/> {smtpSaving ? 'Saving…' : 'Save Email Config'}
+            </button>
+          </div>
+
+          <div className={styles.formCard} style={{marginTop: 16}}>
+            <div className={styles.cardTitle}><Mail size={14}/> Gmail Quick Setup</div>
+            <div className={styles.sectionDesc} style={{marginTop: 8}}>
+              For Gmail: enable 2FA on your Google account, then go to Google Account → Security → App Passwords → create one for "Mail". Use that 16-character code as your SMTP Password.
+            </div>
+            <div style={{marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4}}>
+              {[
+                ['SMTP Host', 'smtp.gmail.com'],
+                ['SMTP Port', '587'],
+                ['SMTP Username', 'your.email@gmail.com'],
+                ['SMTP Password', '16-character App Password'],
+              ].map(([k, v]) => (
+                <div key={k} style={{display:'flex', gap: 12, fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--border)'}}>
+                  <span style={{color:'var(--text2)', width: 140, flexShrink: 0}}>{k}</span>
+                  <span style={{fontFamily:'var(--font-mono)', color:'var(--text)'}}>{v}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

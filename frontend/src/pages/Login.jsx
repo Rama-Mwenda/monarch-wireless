@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
@@ -119,6 +119,9 @@ export default function Login() {
             <button className={styles.btn} type="submit" disabled={loading}>
               {loading ? <span className={styles.spinner}/> : 'Sign In'}
             </button>
+            <Link to="/forgot-password" className={styles.forgotLink}>
+              Forgot password?
+            </Link>
             <div className={styles.hint}>
               Default credentials: <code>admin</code> / <code>admin123</code>
             </div>
