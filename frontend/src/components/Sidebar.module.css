@@ -8,6 +8,36 @@
   height: 100vh;
   position: sticky;
   top: 0;
+  transition: transform 0.25s ease;
+  z-index: 100;
+}
+
+/* ── Mobile: hidden off-screen by default ── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+  }
+  .sidebarOpen {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+}
+
+.overlay {
+  display: none;
+}
+@media (max-width: 768px) {
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 99;
+  }
 }
 
 .logo {
@@ -37,6 +67,7 @@
   display: flex;
   flex-direction: column;
   line-height: 1.1;
+  flex: 1;
 }
 
 .logoName {
@@ -54,24 +85,39 @@
   color: var(--text3);
 }
 
+.closeBtn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .closeBtn { display: flex; }
+}
+
 .nav {
   flex: 1;
   padding: 12px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
 }
 
 .navItem {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
   color: var(--text2);
   font-size: 13.5px;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
+  text-decoration: none;
 }
 
 .navItem:hover {
@@ -126,7 +172,6 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text);
-  truncate: true;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -151,6 +196,7 @@
   justify-content: center;
   transition: color 0.15s, border-color 0.15s;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .logout:hover {

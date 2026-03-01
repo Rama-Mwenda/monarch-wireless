@@ -86,3 +86,15 @@
 .active   { background: rgba(13,187,133,0.12); color: var(--green); }
 .expired  { background: var(--surface3); color: var(--text3); }
 .terminated { background: rgba(240,64,96,0.1); color: var(--red); }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page { padding: 16px; }
+  .header { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+  .controls { gap: 8px; }
+  .searchForm { min-width: 0; width: 100%; }
+  .tierFilters { flex-wrap: wrap; }
+  .overlay { padding: 12px; align-items: flex-end; }
+  .modalHeader { padding: 16px 16px 0; }
+  .detailBody { padding: 16px; }
+}

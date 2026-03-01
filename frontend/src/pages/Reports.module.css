@@ -319,3 +319,101 @@
   font-size: 12px; font-weight: 600; color: var(--text2);
   margin-bottom: 12px;
 }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .monthPicker {
+    flex: 1;
+  }
+
+  .costsBtn, .printBtn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* 2 KPI cards per row */
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* P&L and packages stack */
+  .twoCol {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* All-time stats: 1 row of 3 stays but smaller */
+  .allTimeGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  /* Cost settings grid stacks */
+  .costsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Report itself needs padding reduction */
+  .report {
+    padding: 0;
+  }
+
+  .pnlSection, .pkgSection, .chartSection {
+    padding: 16px;
+  }
+
+  /* Report title stacks */
+  .reportTitle {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .reportMeta {
+    text-align: left;
+  }
+
+  /* Expense edit grid stacks */
+  .expenseEditGrid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Expense row wraps on small screens */
+  .expenseRow {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .expenseAmount {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 400px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .allTimeGrid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

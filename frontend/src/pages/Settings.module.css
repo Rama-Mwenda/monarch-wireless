@@ -90,3 +90,112 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Tabs: full width, scroll horizontally */
+  .tabs {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+
+  /* Section max-width removed on mobile */
+  .section {
+    max-width: 100%;
+  }
+
+  /* Two column form stacks to single */
+  .twoCol {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .formCard {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  /* Admin rows: stack info + meta vertically */
+  .adminRow {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .adminInfo {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .adminName {
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .adminEmail {
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .adminMeta {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  /* Save button full width on mobile */
+  .saveBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Button row stacks */
+  .btnRow {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .testBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Password row stays inline but shrinks */
+  .pwRow {
+    gap: 6px;
+  }
+
+  /* Toast: bottom of screen full width on mobile */
+  .toast {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    font-size: 12px;
+  }
+}

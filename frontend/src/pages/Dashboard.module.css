@@ -339,3 +339,96 @@
   align-items: center;
   gap: 16px;
 }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .headerTitle {
+    font-size: 22px;
+  }
+
+  .headerMeta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* 2 cards per row on mobile */
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .statCard {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .statValue {
+    font-size: 18px;
+  }
+
+  .statSub {
+    font-size: 10.5px;
+  }
+
+  /* Charts stack vertically */
+  .chartsRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .chartCard {
+    padding: 16px;
+  }
+
+  /* Bottom tables stack vertically */
+  .bottomRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .tableCard {
+    padding: 16px;
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 360px;
+  }
+
+  /* Sites stack */
+  .sitesRow {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .siteCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .siteStats {
+    gap: 12px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 400px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}

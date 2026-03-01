@@ -67,3 +67,40 @@
 
 .apStatClickable { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .apStatClickable:hover { border-color: var(--cyan); background: rgba(13,207,207,0.06); }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* 2 summary cards per row */
+  .summaryRow {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  /* AP cards stay auto-fill but smaller min */
+  .apGrid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  /* AP stats: 3 across stays fine but reduce padding */
+  .apStats {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 400px) {
+  .summaryRow {
+    grid-template-columns: 1fr;
+  }
+}
