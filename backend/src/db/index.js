@@ -183,3 +183,26 @@ try {
 seedDefaults();
 
 module.exports = db;
+
+// ── Ensure payment_providers table exists ─────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payment_providers (
+    id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    name        TEXT NOT NULL UNIQUE,
+    label       TEXT NOT NULL,
+    description TEXT,
+    is_active   INTEGER NOT NULL DEFAULT 0,
+    is_default  INTEGER NOT NULL DEFAULT 0,
+    config      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
+
+// Seed default payment providers
+const seedProvider = db.prepare(`
+  INSERT OR IGNORE INTO payment_providers (name, label, description, is_active, is_default)
+  VALUES (?, ?, ?, ?, ?)
+`);
+seedProvider.run('mpesa',    'M-Pesa (Daraja)',  'Safaricom M-Pesa STK Push via Daraja API', 1, 1);
+seedProvider.run('kopokopo', 'KopoKopo (K2)',    'KopoKopo STK Push via K2 Connect API',     0, 0);

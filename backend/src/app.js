@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // ── Security middleware ──────────────────────────────────────
 // Portal needs relaxed CSP (inline scripts + onclick handlers + plain HTTP)
 // All API routes get full strict helmet
@@ -33,7 +35,12 @@ app.use((req, res, next) => {
   return helmet()(req, res, next);
 });
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [
+    process.env.FRONTEND_URL      || 'http://localhost:5173',
+    process.env.DASHBOARD_URL     || 'http://localhost:5173',
+    'https://dashboard.monarchdesigners.co.ke',
+    'http://localhost:5173',
+  ],
   credentials: true,
 }));
 app.use(express.json());
@@ -60,6 +67,7 @@ app.use('/api/network',   require('./routes/network'));
 app.use('/api/mpesa',     require('./routes/mpesa'));
 app.use('/api/sms',       require('./routes/sms-settings'));
 app.use('/api/payment',    require('./routes/payment-settings'));
+app.use('/api/payment',    require('./routes/payment-providers'));
 app.use('/portal',        require('./routes/portal'));
 
 // ── Health check ─────────────────────────────────────────────

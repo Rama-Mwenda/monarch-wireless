@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, UserPlus, Trash2, KeyRound,
          Eye, EyeOff, CheckCircle, AlertCircle, CreditCard,
-         Wifi, FlaskConical, Mail, Send } from 'lucide-react';
+         Wifi, FlaskConical, Mail, Send, ToggleLeft, ToggleRight,
+         Settings as SettingsIcon } from 'lucide-react';
 import api from '../services/api';
 import styles from './Settings.module.css';
 
@@ -39,6 +40,170 @@ function PasswordStrength({ password }) {
   );
 }
 
+
+// ── Payment Provider Card component ──────────────────────────
+function PaymentProviderCard({ provider, saving, onSave }) {
+  const [editing,   setEditing]  = useState(false);
+  const [isDefault, setDefault]  = useState(!!provider.is_default);
+  const [cfg,       setCfg]      = useState(provider.config || {});
+  const [showSecrets, setShow]   = useState({});
+  const [testing,   setTesting]  = useState(false);
+  const [testResult, setTestResult] = useState(null); // { ok, msg }
+
+  const fields = provider.name === 'mpesa' ? [
+    { key: 'env',            label: 'Environment',      secret: false, placeholder: 'sandbox or production', type: 'env' },
+    { key: 'consumerKey',    label: 'Consumer Key',     secret: false, placeholder: 'Daraja consumer key' },
+    { key: 'consumerSecret', label: 'Consumer Secret',  secret: true,  placeholder: 'Daraja consumer secret' },
+    { key: 'shortcode',      label: 'Shortcode',        secret: false, placeholder: '174379' },
+    { key: 'passkey',        label: 'Passkey',          secret: true,  placeholder: 'Daraja passkey' },
+    { key: 'callbackUrl',    label: 'Callback URL',     secret: false, placeholder: 'https://yourdomain.com/api/mpesa/callback' },
+  ] : [
+    { key: 'env',          label: 'Environment',    secret: false, placeholder: 'sandbox or production', type: 'env' },
+    { key: 'clientId',     label: 'Client ID',      secret: false, placeholder: 'K2 client ID' },
+    { key: 'clientSecret', label: 'Client Secret',  secret: true,  placeholder: 'K2 client secret' },
+    { key: 'apiKey',       label: 'API Key',        secret: true,  placeholder: 'K2 API key' },
+    { key: 'tillNumber',   label: 'Till Number',    secret: false, placeholder: 'Your till number' },
+    { key: 'callbackUrl',  label: 'Callback URL',   secret: false, placeholder: 'https://yourdomain.com/api/mpesa/k2-callback' },
+  ];
+
+  function handleSave() {
+    onSave({ is_default: isDefault, config: cfg });
+    setEditing(false);
+  }
+
+  async function handleTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Save config first so test uses latest values
+      await onSave({ is_default: isDefault, config: cfg });
+      const endpoint = provider.name === 'mpesa'
+        ? '/payment/test-connection'
+        : '/payment/test-k2-connection';
+      const res = await import('../services/api').then(m => m.default.post(endpoint));
+      setTestResult({ ok: true, msg: res.data.message || 'Connection successful ✅' });
+    } catch(e) {
+      setTestResult({ ok: false, msg: e.response?.data?.error || 'Connection test failed' });
+    }
+    setTesting(false);
+  }
+
+  return (
+    <div className={`${styles.formCard} ${provider.is_default ? styles.providerDefault : ''}`}
+         style={{ borderColor: provider.is_default ? 'var(--accent)' : undefined }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 8,
+            background: provider.is_default ? 'rgba(240,165,0,0.15)' : 'var(--surface2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: `1px solid ${provider.is_default ? 'rgba(240,165,0,0.3)' : 'var(--border)'}`,
+          }}>
+            <CreditCard size={18} color={provider.is_default ? 'var(--accent)' : 'var(--text3)'} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {provider.label}
+              {provider.is_default && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: 1,
+                  background: 'rgba(240,165,0,0.15)', color: 'var(--accent)',
+                  border: '1px solid rgba(240,165,0,0.3)', borderRadius: 20, padding: '2px 8px',
+                }}>ACTIVE</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{provider.description}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => { setDefault(true); onSave({ is_default: true, config: cfg }); }}
+            disabled={provider.is_default || saving}
+            style={{
+              background: provider.is_default ? 'rgba(240,165,0,0.12)' : 'var(--surface2)',
+              border: `1px solid ${provider.is_default ? 'var(--accent)' : 'var(--border)'}`,
+              color: provider.is_default ? 'var(--accent)' : 'var(--text2)',
+              borderRadius: 6, padding: '6px 14px', fontSize: 12,
+              fontFamily: 'var(--font-mono)', cursor: provider.is_default ? 'default' : 'pointer',
+            }}>
+            {provider.is_default ? '✓ Default' : 'Set as Default'}
+          </button>
+          <button
+            className={styles.editBtn || ''}
+            onClick={() => setEditing(e => !e)}
+            style={{
+              background: 'none', border: '1px solid var(--border)',
+              borderRadius: 6, color: 'var(--text2)', padding: '6px 14px',
+              fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            <SettingsIcon size={12} /> {editing ? 'Cancel' : 'Configure'}
+          </button>
+        </div>
+      </div>
+
+      {/* Config fields */}
+      {editing && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className={styles.twoCol}>
+            {fields.map(f => (
+              <div key={f.key} className={styles.formRow}>
+                <label className={styles.formLabel}>{f.label}</label>
+                {f.type === 'env' ? (
+                  <select
+                    className={styles.formSelect}
+                    value={cfg[f.key] || 'sandbox'}
+                    onChange={e => setCfg(c => ({ ...c, [f.key]: e.target.value }))}>
+                    <option value="sandbox">Sandbox (testing)</option>
+                    <option value="production">Production (live)</option>
+                  </select>
+                ) : (
+                  <div className={styles.pwRow}>
+                    <input
+                      className={styles.formInput}
+                      type={f.secret && !showSecrets[f.key] ? 'password' : 'text'}
+                      value={cfg[f.key] || ''}
+                      onChange={e => setCfg(c => ({ ...c, [f.key]: e.target.value }))}
+                      placeholder={cfg[f.key]?.startsWith('••••') ? 'Leave blank to keep current' : f.placeholder}
+                    />
+                    {f.secret && (
+                      <button type="button" className={styles.eyeBtn}
+                        onClick={() => setShow(s => ({ ...s, [f.key]: !s[f.key] }))}>
+                        {showSecrets[f.key] ? <EyeOff size={14}/> : <Eye size={14}/>}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className={styles.btnRow}>
+            <button className={styles.testBtn} onClick={handleTest} disabled={testing || saving}>
+              <FlaskConical size={13}/> {testing ? 'Testing…' : 'Test Connection'}
+            </button>
+            <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
+              <CreditCard size={13}/> {saving ? 'Saving…' : 'Save Configuration'}
+            </button>
+          </div>
+          {testResult && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 6, fontSize: 12,
+              background: testResult.ok ? 'rgba(13,187,133,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${testResult.ok ? 'rgba(13,187,133,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: testResult.ok ? 'var(--green)' : 'var(--red)',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              {testResult.msg}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const { admin } = useAuth();
   const [admins,  setAdmins]  = useState([]);
@@ -56,6 +221,10 @@ export default function Settings() {
 
   const isSuperAdmin = admin?.role === 'super_admin';
 
+  // Payment providers state
+  const [payProviders,    setPayProviders]    = useState([]);
+  const [savingProvider,  setSavingProvider]  = useState(null);
+
   // SMTP config state
   const [smtpConfig,   setSmtpConfig]   = useState([]);
   const [smtpEdits,    setSmtpEdits]    = useState({});
@@ -64,29 +233,21 @@ export default function Settings() {
   const [testEmail,    setTestEmail]    = useState('');
   const [showSmtpPass, setShowSmtpPass] = useState(false);
 
-  // Payment config state
-  const [payConfig,    setPayConfig]    = useState([]);
-  const [payEdits,     setPayEdits]     = useState({});
-  const [paySaving,    setPaySaving]    = useState(false);
-  const [payTesting,   setPayTesting]   = useState(false);
-  const [showSecrets,  setShowSecrets]  = useState({});
+  const loadPayProviders = () => {
+    api.get('/payment/providers')
+      .then(res => setPayProviders(res.data.providers || []))
+      .catch(console.error);
+  };
 
-  const loadPaymentConfig = () => {
+  const loadSmtpConfig = () => {
     api.get('/payment/config')
       .then(res => {
-        const all = res.data.config || [];
-        const pay  = all.filter(c => c.key.startsWith('mpesa_'));
+        const all  = res.data.config || [];
         const smtp = all.filter(c => c.key.startsWith('smtp_'));
-
-        setPayConfig(pay);
-        const payEditsNew = {};
-        pay.forEach(c => { payEditsNew[c.key] = c.value || ''; });
-        setPayEdits(payEditsNew);
-
         setSmtpConfig(smtp);
-        const smtpEditsNew = {};
-        smtp.forEach(c => { smtpEditsNew[c.key] = c.value || ''; });
-        setSmtpEdits(smtpEditsNew);
+        const edits = {};
+        smtp.forEach(c => { edits[c.key] = c.value || ''; });
+        setSmtpEdits(edits);
       })
       .catch(console.error);
   };
@@ -100,7 +261,8 @@ export default function Settings() {
   useEffect(() => {
     if (isSuperAdmin) {
       loadAdmins();
-      loadPaymentConfig();
+      loadPayProviders();
+    loadSmtpConfig();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -150,13 +312,27 @@ export default function Settings() {
     }
   }
 
+  async function saveProvider(id, updates) {
+    setSavingProvider(id);
+    try {
+      await api.put(`/payment/providers/${id}`, updates);
+      showToast('Payment provider updated ✅', 'success');
+      loadPayProviders();
+    loadSmtpConfig();
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Failed to update provider', 'error');
+    }
+    setSavingProvider(null);
+  }
+
   async function handleSaveSmtp() {
     setSmtpSaving(true);
     try {
       const updates = Object.entries(smtpEdits).map(([key, value]) => ({ key, value }));
       await api.put('/payment/config', { updates });
       showToast('Email config saved ✅', 'success');
-      loadPaymentConfig();
+      loadPayProviders();
+    loadSmtpConfig();
     } catch(e) {
       showToast(e.response?.data?.error || 'Failed to save SMTP config', 'error');
     }
@@ -177,39 +353,12 @@ export default function Settings() {
     setSmtpTesting(false);
   }
 
-  async function handleSavePayment() {
-    setPaySaving(true);
-    try {
-      const updates = Object.entries(payEdits).map(([key, value]) => ({ key, value }));
-      await api.put('/payment/config', { updates });
-      showToast('M-Pesa config saved ✅', 'success');
-      loadPaymentConfig();
-    } catch(e) {
-      showToast(e.response?.data?.error || 'Failed to save config', 'error');
-    }
-    setPaySaving(false);
-  }
-
-  async function handleTestConnection() {
-    setPayTesting(true);
-    try {
-      // Save first so test uses latest values
-      const updates = Object.entries(payEdits).map(([key, value]) => ({ key, value }));
-      await api.put('/payment/config', { updates });
-      const res = await api.post('/payment/test-connection');
-      showToast(res.data.message, 'success');
-    } catch(e) {
-      showToast(e.response?.data?.error || 'Connection test failed', 'error');
-    }
-    setPayTesting(false);
-  }
-
   function showToast(msg, type) { setToast({ msg, type }); }
 
   const tabs = [
     { key: 'password', label: 'Change Password', icon: KeyRound },
     ...(isSuperAdmin ? [{ key: 'admins',  label: 'Admin Accounts', icon: ShieldCheck }] : []),
-    ...(isSuperAdmin ? [{ key: 'payment', label: 'M-Pesa Config',  icon: CreditCard  }] : []),
+    ...(isSuperAdmin ? [{ key: 'providers', label: 'Payment Gateways', icon: CreditCard }] : []),
     ...(isSuperAdmin ? [{ key: 'email',   label: 'Email Config',   icon: Mail        }] : []),
   ];
 
@@ -282,6 +431,28 @@ export default function Settings() {
               <KeyRound size={13}/>
               {pwSaving ? 'Updating…' : 'Update Password'}
             </button>
+          </div>
+        </div>
+      )}
+
+
+      {/* ── PAYMENT PROVIDERS ── */}
+      {tab === 'providers' && isSuperAdmin && (
+        <div className={styles.section}>
+          <div className={styles.sectionDesc}>
+            Choose which payment gateway guests use on the captive portal.
+            Set one as <strong>Default</strong> — the portal will use that gateway for all STK Push payments.
+          </div>
+
+          <div className={styles.adminList}>
+            {payProviders.map(p => (
+              <PaymentProviderCard
+                key={p.id}
+                provider={p}
+                saving={savingProvider === p.id}
+                onSave={(updates) => saveProvider(p.id, updates)}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -367,81 +538,7 @@ export default function Settings() {
       )}
 
       {/* ── M-PESA CONFIG ── */}
-      {tab === 'payment' && isSuperAdmin && (
-        <div className={styles.section}>
-          <div className={styles.sectionDesc}>
-            Configure M-Pesa Daraja API credentials. Changes take effect immediately — no restart required.
-          </div>
 
-          <div className={styles.formCard}>
-            <div className={styles.cardTitle}><CreditCard size={14}/> M-Pesa Daraja API</div>
-
-            {/* Environment toggle */}
-            {payConfig.filter(c => c.key === 'mpesa_env').map(c => (
-              <div key={c.key} className={styles.formRow}>
-                <label className={styles.formLabel}>{c.label}</label>
-                <select
-                  className={styles.formSelect}
-                  value={payEdits[c.key] || 'sandbox'}
-                  onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}>
-                  <option value="sandbox">Sandbox (testing)</option>
-                  <option value="production">Production (live)</option>
-                </select>
-                <div className={styles.fieldDesc}>{c.description}</div>
-              </div>
-            ))}
-
-            {/* Shortcode + Callback URL — not secret */}
-            <div className={styles.twoCol}>
-              {payConfig.filter(c => ['mpesa_shortcode','mpesa_callback_url'].includes(c.key)).map(c => (
-                <div key={c.key} className={styles.formRow}>
-                  <label className={styles.formLabel}>{c.label}</label>
-                  <input
-                    className={styles.formInput}
-                    type="text"
-                    value={payEdits[c.key] || ''}
-                    onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}
-                    placeholder={c.description}
-                  />
-                  <div className={styles.fieldDesc}>{c.description}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Secret fields — Consumer Key, Secret, Passkey */}
-            {payConfig.filter(c => c.is_secret && c.key !== 'mpesa_env').map(c => (
-              <div key={c.key} className={styles.formRow}>
-                <label className={styles.formLabel}>{c.label}</label>
-                <div className={styles.pwRow}>
-                  <input
-                    className={styles.formInput}
-                    type={showSecrets[c.key] ? 'text' : 'password'}
-                    value={payEdits[c.key] || ''}
-                    onChange={e => setPayEdits(f => ({...f, [c.key]: e.target.value}))}
-                    placeholder={c._has_value ? 'Leave blank to keep existing' : c.description}
-                  />
-                  <button type="button" className={styles.eyeBtn}
-                    onClick={() => setShowSecrets(s => ({...s, [c.key]: !s[c.key]}))}>
-                    {showSecrets[c.key] ? <EyeOff size={14}/> : <Eye size={14}/>}
-                  </button>
-                </div>
-                <div className={styles.fieldDesc}>{c.description}</div>
-              </div>
-            ))}
-
-            <div className={styles.btnRow}>
-              <button className={styles.testBtn} onClick={handleTestConnection} disabled={payTesting}>
-                <FlaskConical size={13}/>
-                {payTesting ? 'Testing…' : 'Test Connection'}
-              </button>
-              <button className={styles.saveBtn} onClick={handleSavePayment} disabled={paySaving}>
-                <CreditCard size={13}/>
-                {paySaving ? 'Saving…' : 'Save Config'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── ADMIN ACCOUNTS ── */}
       {tab === 'admins' && isSuperAdmin && (
