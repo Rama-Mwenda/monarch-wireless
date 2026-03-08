@@ -206,3 +206,34 @@ const seedProvider = db.prepare(`
 `);
 seedProvider.run('mpesa',    'M-Pesa (Daraja)',  'Safaricom M-Pesa STK Push via Daraja API', 1, 1);
 seedProvider.run('kopokopo', 'KopoKopo (K2)',    'KopoKopo STK Push via K2 Connect API',     0, 0);
+
+// ── Host management migrations ────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ap_admins (
+    id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    admin_id   TEXT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+    ap_mac     TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(admin_id, ap_mac)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ap_package_overrides (
+    id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    ap_mac     TEXT NOT NULL,
+    package_id TEXT NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+    price      REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(ap_mac, package_id)
+  )
+`);
+
+// Add revenue_share_pct to access_points
+safeAlter('ALTER TABLE access_points ADD COLUMN revenue_share_pct REAL NOT NULL DEFAULT 70');
+safeAlter('ALTER TABLE access_points ADD COLUMN host_name TEXT');
+safeAlter('ALTER TABLE access_points ADD COLUMN host_phone TEXT');
+
+// Ensure sessions has ap_mac (may already exist)
+safeAlter('ALTER TABLE sessions ADD COLUMN ap_mac TEXT');

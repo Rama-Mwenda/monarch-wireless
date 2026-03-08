@@ -30,8 +30,10 @@ export default function Login() {
         setToken(res.data.token);
         setStep('change-password');
       } else {
-        await login(form.username, form.password);
-        navigate('/');
+        const adminData = await login(form.username, form.password);
+        if (adminData.role === 'site_manager') navigate('/host');
+        else if (adminData.role === 'viewer') navigate('/overview');
+        else navigate('/');
       }
     } catch(err) {
       setError(err.response?.data?.error || 'Login failed. Check your credentials.');
@@ -60,8 +62,10 @@ export default function Login() {
       );
       setSuccess('Password updated! Signing you in…');
       setTimeout(async () => {
-        await login(form.username, pwForm.newPassword);
-        navigate('/');
+        const adminData = await login(form.username, pwForm.newPassword);
+        if (adminData.role === 'site_manager') navigate('/host');
+        else if (adminData.role === 'viewer') navigate('/overview');
+        else navigate('/');
       }, 1200);
     } catch(err) {
       setError(err.response?.data?.error || 'Failed to update password');

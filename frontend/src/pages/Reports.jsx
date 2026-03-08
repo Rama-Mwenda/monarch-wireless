@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   BarChart2, TrendingUp, TrendingDown, Printer, Calendar,
-  DollarSign, Settings, Check, Plus, Trash2, Edit2, X, Save,
+  DollarSign, Settings, Plus, Trash2, Edit2, X, Save,
   Wifi, Server, HardDrive, Users, Zap, Package,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import styles from './Reports.module.css';
 
@@ -33,10 +34,11 @@ function PnLRow({ label, value, sub, highlight, negative, indent }) {
 }
 
 function StatCard({ label, value, sub, color, icon }) {
+  const Icon = icon;
   return (
     <div className={styles.statCard}>
       <div className={styles.statTop}>
-        <div className={styles.statIcon} style={{background:`${color}15`,color}}>{React.createElement(icon,{size:16,strokeWidth:1.8})}</div>
+        <div className={styles.statIcon} style={{background:`${color}15`,color}}><Icon size={16} strokeWidth={1.8}/></div>
       </div>
       <div className={styles.statVal}>{value}</div>
       <div className={styles.statLabel}>{label}</div>
@@ -193,6 +195,8 @@ function AddExpenseForm({ onAdd, onClose }) {
 }
 
 export default function Reports() {
+  const { admin } = useAuth();
+  const isViewer = admin?.role === 'viewer';
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
@@ -250,42 +254,125 @@ export default function Reports() {
     .filter(cat=>cat.items.length > 0);
 
   function handlePrint() {
-    const el = document.getElementById('report');
-    if (!el) return;
-    const win = window.open('','_blank','width=1100,height=800');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Monarch P&L</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
-<style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#080c12;--surface:#0f1620;--surface2:#111c2a;--surface3:#162030;--border:#1e2d45;--border2:#2a3f5f;--accent:#f0a500;--green:#0dbb85;--cyan:#0dcfcf;--red:#f04060;--text:#dde6f0;--text2:#8a9bb5;--text3:#4a5a72;--font-display:'Syne',sans-serif;--font-body:'Manrope',sans-serif;--font-mono:'DM Mono',monospace;--radius:8px}
-html,body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-print-color-adjust:exact;print-color-adjust:exact}
-#rpt{padding:32px;display:flex;flex-direction:column;gap:24px}
-.rpt-title{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid var(--border)}
-.rpt-brand{display:flex;align-items:center;gap:12px}.rpt-mark{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:20px;font-weight:800;color:#000}
-.rpt-brand-name{font-family:var(--font-display);font-size:16px;font-weight:700}.rpt-brand-sub{font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:1px;margin-top:2px}
-.rpt-meta{text-align:right}.rpt-meta-title{font-family:var(--font-display);font-size:18px;font-weight:700}.rpt-meta-sub{font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-top:2px}.rpt-meta-date{font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-top:4px}
-.rpt-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.rpt-kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}.rpt-kpi-val{font-family:var(--font-display);font-size:18px;font-weight:800;margin-bottom:4px}.rpt-kpi-label{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}.rpt-kpi-sub{font-size:11px;color:var(--text2);margin-top:4px}
-.rpt-two{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
-.rpt-section-title{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:14px}
-.rpt-pnl{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-.rpt-group{margin-bottom:12px}.rpt-group-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:4px}
-.rpt-row{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
-.rpt-row.highlight{background:rgba(240,165,0,0.06);border-radius:4px;padding:8px 10px;margin:4px -10px}.rpt-row.highlight .rpt-val{color:var(--accent);font-size:15px;font-weight:700}
-.rpt-row.negative .rpt-val{color:var(--red)}.rpt-row.indent .rpt-lbl{padding-left:14px;color:var(--text2);font-size:12px}
-.rpt-lbl{flex:1;font-size:13px;color:var(--text)}.rpt-val{font-family:var(--font-mono);font-size:13px;white-space:nowrap}.rpt-sub{font-family:var(--font-mono);font-size:10px;color:var(--text3);white-space:nowrap}
-.rpt-divider{height:1px;background:var(--border2);margin:8px 0}
-.rpt-metric{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:12.5px;color:var(--text2)}.rpt-metric-val{font-family:var(--font-mono);font-size:13px;font-weight:500}
-.rpt-pkg{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}.rpt-pkg-list{display:flex;flex-direction:column;gap:14px}.rpt-pkg-item{display:flex;flex-direction:column;gap:5px}.rpt-pkg-header{display:flex;justify-content:space-between}.rpt-pkg-name{font-size:13.5px;font-weight:500}.rpt-pkg-rev{font-family:var(--font-mono);font-size:13px}.rpt-pkg-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}.rpt-pkg-fill{height:100%;border-radius:3px}.rpt-pkg-meta{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--text3)}
-.rpt-alltime{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.rpt-alltime-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}.rpt-alltime-val{font-family:var(--font-display);font-size:16px;font-weight:800;margin-bottom:4px}.rpt-alltime-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3)}
-.rpt-footer{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--text3);padding-top:16px;border-top:1px solid var(--border)}
-@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@page{margin:.5in}}</style>
-</head><body><div id="rpt">${el.innerHTML}</div>
-<script>
-function remap(){const map=[['reportTitle','rpt-title'],['reportBrand','rpt-brand'],['reportMark','rpt-mark'],['reportBrandName','rpt-brand-name'],['reportBrandSub','rpt-brand-sub'],['reportMeta','rpt-meta'],['reportMetaTitle','rpt-meta-title'],['reportMetaSub','rpt-meta-sub'],['reportMetaDate','rpt-meta-date'],['kpiGrid','rpt-kpi'],['statCard','rpt-kpi-card'],['statVal','rpt-kpi-val'],['statLabel','rpt-kpi-label'],['statSub','rpt-kpi-sub'],['twoCol','rpt-two'],['sectionTitle','rpt-section-title'],['pnlSection','rpt-pnl'],['pnlGroup','rpt-group'],['pnlGroupLabel','rpt-group-label'],['pnlRow','rpt-row'],['pnlHighlight','highlight'],['pnlNegative','negative'],['pnlIndent','indent'],['pnlLabel','rpt-lbl'],['pnlValue','rpt-val'],['pnlSub','rpt-sub'],['pnlDivider','rpt-divider'],['metricRow','rpt-metric'],['metricVal','rpt-metric-val'],['pkgSection','rpt-pkg'],['pkgList','rpt-pkg-list'],['pkgItem','rpt-pkg-item'],['pkgHeader','rpt-pkg-header'],['pkgName','rpt-pkg-name'],['pkgRev','rpt-pkg-rev'],['pkgBar','rpt-pkg-bar'],['pkgFill','rpt-pkg-fill'],['pkgMeta','rpt-pkg-meta'],['allTimeGrid','rpt-alltime'],['allTimeStat','rpt-alltime-stat'],['allTimeVal','rpt-alltime-val'],['allTimeLbl','rpt-alltime-lbl'],['reportFooter','rpt-footer']];
-document.querySelectorAll('[class]').forEach(n=>{Array.from(n.classList).forEach(c=>{map.forEach(([k,t])=>{if(c.includes(k)){n.classList.remove(c);t.split(' ').forEach(x=>n.classList.add(x))}})})});}
-remap();
-document.querySelectorAll('.recharts-tooltip-wrapper,.statTop,.statIcon,.expensePanel,.costsPanel').forEach(e=>e.remove());
-setTimeout(()=>{window.print();window.close();},800);
-</' + 'script></body></html>`);
+    const win = window.open('', '_blank', 'width=900,height=700');
+
+    win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>Monarch Wireless — P&L Report ${monthLabel}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { padding: 0; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; border-bottom: 2px solid #f0a500; margin-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 36px; height: 36px; background: #f0a500; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #000; }
+  .brand-name { font-size: 16px; font-weight: 700; color: #0f1620; }
+  .brand-sub { font-size: 10px; color: #888; letter-spacing: 1px; margin-top: 2px; }
+  .meta-title { font-size: 18px; font-weight: 700; text-align: right; }
+  .meta-period { font-size: 12px; color: #f0a500; font-weight: 600; text-align: right; margin-top: 2px; }
+  .meta-date { font-size: 10px; color: #888; text-align: right; margin-top: 2px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+  .kpi { background: #f8f9fc; border: 1px solid #e0e4f0; border-radius: 6px; padding: 12px 14px; }
+  .kpi-val { font-size: 17px; font-weight: 700; color: #0f1620; }
+  .kpi-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-top: 3px; }
+  .kpi-sub { font-size: 11px; color: #555; margin-top: 4px; }
+  .section { margin-bottom: 18px; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #888; margin-bottom: 8px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  .tbl-head th { background: #f0f2f8; padding: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #555; text-align: left; }
+  .tbl-head th:last-child { text-align: right; }
+  tr { border-bottom: 1px solid #f0f2f8; }
+  .cat-row td { background: #f8f9fc; font-size: 11px; font-weight: 600; color: #555; padding: 6px 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .total-row td { font-weight: 700; font-size: 13px; padding: 10px 8px; border-top: 2px solid #e0e4f0; }
+  .net-row td { font-weight: 800; font-size: 14px; padding: 10px 8px; background: ${netProfit >= 0 ? '#f0fdf4' : '#fff5f5'}; color: ${netProfit >= 0 ? '#166534' : '#991b1b'}; border-top: 2px solid ${netProfit >= 0 ? '#86efac' : '#fca5a5'}; }
+  .pkg-bar-bg { background: #e0e4f0; border-radius: 3px; height: 6px; }
+  .pkg-bar-fill { background: #f0a500; border-radius: 3px; height: 6px; }
+  .two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+  .metric-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f0f2f8; font-size: 12px; }
+  .metric-val { font-weight: 600; font-family: monospace; }
+  .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e0e4f0; display: flex; justify-content: space-between; font-size: 10px; color: #aaa; }
+  @media print {
+    @page { size: A4 portrait; margin: 18mm 16mm; }
+    body { font-size: 12px; }
+    .kpi-val { font-size: 15px; }
+  }
+</style></head><body><div class="page">
+
+  <div class="header">
+    <div class="brand">
+      <div class="mark">M</div>
+      <div><div class="brand-name">Monarch Wireless</div><div class="brand-sub">DESIGNERS HOTSPOT · NAIROBI</div></div>
+    </div>
+    <div>
+      <div class="meta-title">Profit & Loss Statement</div>
+      <div class="meta-period">${monthLabel}</div>
+      <div class="meta-date">Printed ${new Date().toLocaleString('en-KE', {dateStyle:'medium',timeStyle:'short'})}</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val">KES ${revenue.toLocaleString()}</div><div class="kpi-lbl">Gross Revenue</div><div class="kpi-sub">KES ${revenueToday.toLocaleString()} today</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:${netProfit>=0?'#166534':'#991b1b'}">KES ${netProfit.toLocaleString()}</div><div class="kpi-lbl">Net Profit</div><div class="kpi-sub">${profitMargin}% margin</div></div>
+    <div class="kpi"><div class="kpi-val">KES ${totalCosts.toLocaleString()}</div><div class="kpi-lbl">Total Costs</div><div class="kpi-sub">Monthly operating</div></div>
+    <div class="kpi"><div class="kpi-val">${roi}%</div><div class="kpi-lbl">ROI</div><div class="kpi-sub">${totalUsers} total users</div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="section">
+      <div class="section-title">P&L Summary</div>
+      <table>
+        <thead class="tbl-head"><tr><th>Item</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>
+          <tr class="cat-row"><td colspan="2">REVENUE</td></tr>
+          <tr><td style="padding:6px 8px;font-size:12px">Gross Revenue</td><td style="padding:6px 8px;text-align:right;font-family:monospace;font-size:12px;color:#166534">KES ${revenue.toLocaleString()}</td></tr>
+          <tr class="cat-row"><td colspan="2">OPERATING COSTS</td></tr>
+          ${expensesByCategory.map(cat => `
+            <tr class="cat-row"><td colspan="2" style="padding-left:16px;font-size:10px">${cat.label}</td></tr>
+            ${cat.items.map(e => {
+              const m = e.is_monthly ? e.amount : (e.amort_months > 0 ? Math.round(e.amount/e.amort_months) : 0);
+              return `<tr><td style="padding:5px 8px 5px 24px;color:#555;font-size:12px">${e.label}</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-size:12px">KES ${m.toLocaleString()}</td></tr>`;
+            }).join('')}
+          `).join('')}
+          <tr class="total-row"><td>Total Costs</td><td style="text-align:right;font-family:monospace">KES ${totalCosts.toLocaleString()}</td></tr>
+          <tr class="net-row"><td>Net Profit</td><td style="text-align:right;font-family:monospace">KES ${netProfit.toLocaleString()}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <div class="section">
+        <div class="section-title">Revenue by Package</div>
+        <table>
+          ${pkgBreakdown.map(p => {
+            const pct = totalPkgRev > 0 ? Math.round(p.revenue/totalPkgRev*100) : 0;
+            return `<tr style="border-bottom:1px solid #f0f2f8">
+              <td style="padding:7px 8px;font-size:12px">${p.name}<div style="margin-top:4px"><div class="pkg-bar-bg"><div class="pkg-bar-fill" style="width:${pct}%"></div></div></div></td>
+              <td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:12px;white-space:nowrap">KES ${p.revenue.toLocaleString()}<br/><span style="font-size:10px;color:#888">${p.sessions} sessions</span></td>
+            </tr>`;
+          }).join('')}
+        </table>
+      </div>
+
+      <div class="section" style="margin-top:14px">
+        <div class="section-title">Key Metrics</div>
+        <div class="metric-row"><span>Avg Daily Revenue</span><span class="metric-val">KES ${avgDaily.toLocaleString()}</span></div>
+        <div class="metric-row"><span>Profit Margin</span><span class="metric-val">${profitMargin}%</span></div>
+        <div class="metric-row"><span>Return on Investment</span><span class="metric-val">${roi}%</span></div>
+        <div class="metric-row"><span>All-Time Revenue</span><span class="metric-val">KES ${allTime.toLocaleString()}</span></div>
+        <div class="metric-row"><span>Total Users</span><span class="metric-val">${totalUsers}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Monarch Wireless · Designers Hotspot · Nairobi</span>
+    <span>Generated by Monarch Dashboard</span>
+  </div>
+
+</div></body></html>`);
     win.document.close();
+    win.onload = () => win.print();
   }
 
   return (
@@ -305,9 +392,11 @@ setTimeout(()=>{window.print();window.close();},800);
               {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <button className={`${styles.costsBtn}${showCosts?' '+styles.costsBtnActive:''}`} onClick={()=>setShowCosts(s=>!s)}>
-            <Settings size={14}/> Expenses
-          </button>
+          {!isViewer && (
+            <button className={`${styles.costsBtn}${showCosts?' '+styles.costsBtnActive:''}`} onClick={()=>setShowCosts(s=>!s)}>
+              <Settings size={14}/> Expenses
+            </button>
+          )}
           <button className={styles.printBtn} onClick={handlePrint}><Printer size={14}/> Print / PDF</button>
         </div>
       </div>
@@ -324,12 +413,12 @@ setTimeout(()=>{window.print();window.close();},800);
           <div className={styles.expenseList}>
             {expenses.map(e=>(
               <ExpenseRow key={e.id} expense={e} onSave={handleSaveExpense}
-                onDelete={handleDeleteExpense} locked={LOCKED.includes(e.id)}/>
+                onDelete={handleDeleteExpense} locked={LOCKED.includes(e.id) || isViewer}/>
             ))}
           </div>
           {showAddForm
             ? <AddExpenseForm onAdd={handleAddExpense} onClose={()=>setShowAddForm(false)}/>
-            : <button className={styles.addExpenseBtn} onClick={()=>setShowAddForm(true)}><Plus size={13}/> Add Expense</button>
+            : (!isViewer && <button className={styles.addExpenseBtn} onClick={()=>setShowAddForm(true)}><Plus size={13}/> Add Expense</button>)
           }
         </div>
       )}

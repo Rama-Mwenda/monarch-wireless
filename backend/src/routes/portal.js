@@ -13,8 +13,10 @@ router.get('/', (req, res) => {
 });
 
 // ── GET /portal/packages — PUBLIC, no auth needed
+// Accepts optional ?ap_mac=XX:XX:XX query param to apply per-AP price overrides
 router.get('/packages', (req, res) => {
-  try {
+  const { ap_mac } = req.query;
+
   const packages = db.prepare(`
     SELECT
       p.id, p.name, p.price, p.duration_minutes, p.data_cap_mb, p.is_active, p.is_promo,
@@ -27,27 +29,31 @@ router.get('/packages', (req, res) => {
     ORDER BY p.price ASC
   `).all();
 
-  if (!packages.length) return res.json([]);
+  // Apply per-AP price overrides if ap_mac provided
+  let overrideMap = {};
+  if (ap_mac) {
+    const overrides = db.prepare(
+      'SELECT package_id, price FROM ap_package_overrides WHERE ap_mac = ?'
+    ).all(ap_mac);
+    overrideMap = Object.fromEntries(overrides.map(o => [o.package_id, o.price]));
+  }
 
   // Calculate revenue share and mark most popular
   const totalRevenue = packages.reduce((sum, p) => sum + p.total_revenue, 0);
   const withShare = packages.map(p => ({
     ...p,
+    price: overrideMap[p.id] ?? p.price,   // apply override if exists
     revenue_share: totalRevenue > 0 ? (p.total_revenue / totalRevenue) : 0,
   }));
 
   // Most popular = highest revenue share, only badge if >25% share
-  const maxRevenue = withShare.length ? Math.max(...withShare.map(p => p.total_revenue)) : 0;
+  const maxRevenue = Math.max(...withShare.map(p => p.total_revenue));
   const result = withShare.map(p => ({
     ...p,
     is_popular: maxRevenue > 0 && p.total_revenue === maxRevenue && p.revenue_share >= 0.25,
   }));
 
   res.json(result);
-  } catch(err) {
-    console.error('Portal packages error:', err.message);
-    res.status(500).json({ error: 'Failed to load packages', detail: err.message });
-  }
 });
 
 // ── GET /portal/vouchers/lookup?code=MW-XXXX-XXXX — PUBLIC

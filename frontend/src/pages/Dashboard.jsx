@@ -4,6 +4,7 @@ import { TrendingUp, Users, Wifi, CreditCard, Activity, Star } from 'lucide-reac
 import api from '../services/api';
 import styles from './Dashboard.module.css';
 import MpesaButton from '../components/MpesaButton';
+import { useAuth } from '../context/AuthContext';
 
 const TIER_COLORS = {
   platinum: '#e2e8f0',
@@ -12,7 +13,8 @@ const TIER_COLORS = {
   bronze: '#cd7c3a',
 };
 
-function StatCard({ label, value, sub, icon: Icon, color, delay = 0 }) {
+function StatCard({ label, value, sub, icon, color, delay = 0 }) {
+  const Icon = icon;
   return (
     <div className={styles.statCard} style={{ animationDelay: `${delay}ms` }}>
       <div className={styles.statIcon} style={{ background: `${color}18`, color }}>
@@ -39,6 +41,8 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export default function Dashboard() {
+  const { admin } = useAuth();
+  const canCollect = admin?.role === 'super_admin' || admin?.role === 'site_manager';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,12 +61,6 @@ export default function Dashboard() {
 
   if (!data) return <div className={styles.loading}>Failed to load dashboard</div>;
 
-  const tierData = (data.tier_breakdown || []).map(t => ({
-    name: t.tier,
-    value: t.count,
-    color: TIER_COLORS[t.tier] || '#8a9bb5',
-  }));
-
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -75,7 +73,7 @@ export default function Dashboard() {
             <span className={styles.liveDot} />
             Live
           </div>
-          <MpesaButton label="Collect Payment" />
+          {canCollect && <MpesaButton label="Collect Payment" />}
         </div>
       </div>
 

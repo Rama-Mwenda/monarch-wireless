@@ -2,12 +2,13 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  LayoutDashboard, Wifi, Package, Users,
+  LayoutDashboard, Wifi, Package, Users, TrendingUp,
   Ticket, BarChart2, LogOut, Settings as SettingsIcon, MessageSquare, X
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
-const nav = [
+// Nav items by role
+const superAdminNav = [
   { to: '/',          icon: LayoutDashboard, label: 'Overview'  },
   { to: '/network',   icon: Wifi,            label: 'Network'   },
   { to: '/packages',  icon: Package,         label: 'Packages'  },
@@ -18,8 +19,27 @@ const nav = [
   { to: '/settings',  icon: SettingsIcon,    label: 'Settings'  },
 ];
 
+const viewerNav = [
+  { to: '/overview',          icon: LayoutDashboard, label: 'Overview' },
+  { to: '/overview/network',  icon: Wifi,            label: 'Network'  },
+  { to: '/overview/reports',  icon: BarChart2,       label: 'Reports'  },
+  { to: '/overview/packages', icon: Package,         label: 'Packages' },
+  { to: '/overview/settings', icon: SettingsIcon,    label: 'Settings' },
+];
+
+const hostNav = [
+  { to: '/host',          icon: LayoutDashboard, label: 'My Revenue' },
+  { to: '/host/pricing',  icon: Package,         label: 'Pricing'    },
+  { to: '/host/clients',  icon: Users,           label: 'Clients'    },
+  { to: '/host/vouchers', icon: Ticket,          label: 'Vouchers'   },
+  { to: '/host/settings', icon: SettingsIcon,    label: 'Settings'   },
+];
+
 export default function Sidebar({ open, onClose }) {
   const { admin, logout } = useAuth();
+  const isHost   = admin?.role === 'site_manager';
+  const isViewer = admin?.role === 'viewer';
+  const nav = isHost ? hostNav : isViewer ? viewerNav : superAdminNav;
   const navigate = useNavigate();
 
   function handleLogout() {

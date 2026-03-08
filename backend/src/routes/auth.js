@@ -39,11 +39,13 @@ router.post('/login', loginLimiter, (req, res) => {
     { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   );
 
+  // Force password change if: using default password OR first ever login (new account)
   const isDefaultPassword = bcrypt.compareSync('admin123', admin.password);
+  const isFirstLogin = !admin.last_login;
 
   res.json({
     token,
-    mustChangePassword: isDefaultPassword,
+    mustChangePassword: isDefaultPassword || isFirstLogin,
     admin: {
       id:       admin.id,
       username: admin.username,

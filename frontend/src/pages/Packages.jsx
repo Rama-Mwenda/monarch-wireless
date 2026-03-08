@@ -6,7 +6,7 @@ import styles from './Packages.module.css';
 const EMPTY_FORM = {
   name: '', price: '', duration_minutes: '', loyalty_points: '',
   download_kbps: '', upload_kbps: '', data_cap_mb: '',
-  is_promo: false, device_limit: 1, site_id: '',
+  is_promo: false, site_id: '',
 };
 
 function formatDuration(mins) {
@@ -31,7 +31,7 @@ function Modal({ title, onClose, children }) {
   );
 }
 
-export default function Packages() {
+export default function Packages({ readOnly = false }) {
   const [packages, setPackages] = useState([]);
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,6 @@ export default function Packages() {
       upload_kbps: pkg.upload_kbps || '',
       data_cap_mb: pkg.data_cap_mb || '',
       is_promo: !!pkg.is_promo,
-      device_limit: pkg.device_limit ?? 1,
       site_id: pkg.site_id,
     });
     setError('');
@@ -95,10 +94,6 @@ export default function Packages() {
         download_kbps: form.download_kbps ? parseInt(form.download_kbps) : null,
         upload_kbps: form.upload_kbps ? parseInt(form.upload_kbps) : null,
         data_cap_mb: form.data_cap_mb ? parseInt(form.data_cap_mb) : null,
-        is_promo: form.is_promo ? 1 : 0,
-        device_limit: parseInt(form.device_limit) || 1,
-        promo_start: form.promo_start || null,
-        promo_end: form.promo_end || null,
       };
       if (editing) {
         await api.patch(`/packages/${editing.id}`, payload);
@@ -141,11 +136,11 @@ export default function Packages() {
       <div className={styles.sectionLabel}>Active — {active.length} packages</div>
       <div className={styles.grid}>
         {active.map(pkg => (
-          <PackageCard key={pkg.id} pkg={pkg} onEdit={openEdit} onToggle={toggleActive} />
+          <PackageCard key={pkg.id} pkg={pkg} onEdit={openEdit} onToggle={toggleActive} readOnly={readOnly} />
         ))}
         <button className={styles.addCard} onClick={openCreate}>
           <Plus size={24} strokeWidth={1.5} />
-          <span>Add Package</span>
+          {!readOnly && <span>Add Package</span>}
         </button>
       </div>
 
@@ -156,13 +151,13 @@ export default function Packages() {
           </div>
           <div className={styles.grid}>
             {inactive.map(pkg => (
-              <PackageCard key={pkg.id} pkg={pkg} onEdit={openEdit} onToggle={toggleActive} />
+              <PackageCard key={pkg.id} pkg={pkg} onEdit={openEdit} onToggle={toggleActive} readOnly={readOnly} />
             ))}
           </div>
         </>
       )}
 
-      {showModal && (
+      {showModal && !readOnly && (
         <Modal title={editing ? 'Edit Package' : 'New Package'} onClose={() => setShowModal(false)}>
           <form onSubmit={handleSave} className={styles.form}>
             <div className={styles.formRow}>
@@ -233,27 +228,6 @@ export default function Packages() {
               </div>
             </div>
             <label className={styles.checkRow}>
-              {/* Device limit */}
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-                <div>
-                  <label style={{display:'block',marginBottom:'6px',fontSize:'11px',letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--text2)',fontFamily:'var(--font-mono)'}}>
-                    Device Limit
-                  </label>
-                  <select
-                    value={form.device_limit}
-                    onChange={e => setForm(f => ({ ...f, device_limit: e.target.value }))}
-                    style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text)',padding:'10px 14px',fontFamily:'var(--font-mono)',fontSize:'13px',outline:'none'}}
-                  >
-                    <option value={0}>Unlimited</option>
-                    <option value={1}>1 device</option>
-                    <option value={2}>2 devices</option>
-                    <option value={3}>3 devices</option>
-                    <option value={5}>5 devices</option>
-                    <option value={10}>10 devices</option>
-                  </select>
-                </div>
-              </div>
-
               <input type="checkbox" checked={form.is_promo}
                 onChange={e => setForm(f => ({ ...f, is_promo: e.target.checked }))} />
               <span>Mark as promotional package</span>
@@ -274,7 +248,7 @@ export default function Packages() {
   );
 }
 
-function PackageCard({ pkg, onEdit, onToggle }) {
+function PackageCard({ pkg, onEdit, onToggle, readOnly = false }) {
   return (
     <div className={`${styles.card} ${!pkg.is_active ? styles.inactive : ''}`}>
       {pkg.is_promo && <div className={styles.promoBadge}><Star size={10} /> PROMO</div>}
@@ -295,9 +269,11 @@ function PackageCard({ pkg, onEdit, onToggle }) {
         <span>KES {(pkg.total_revenue || 0).toLocaleString()}</span>
       </div>
       <div className={styles.cardActions}>
-        <button className={styles.editBtn} onClick={() => onEdit(pkg)}>
-          <Edit2 size={13} /> Edit
-        </button>
+        {!readOnly && (
+          <button className={styles.editBtn} onClick={() => onEdit(pkg)}>
+            <Edit2 size={13} /> Edit
+          </button>
+        )}
         <button className={styles.toggleBtn} onClick={() => onToggle(pkg)}>
           {pkg.is_active
             ? <><ToggleRight size={15} color="var(--green)" /> Active</>

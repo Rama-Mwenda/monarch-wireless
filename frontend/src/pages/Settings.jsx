@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, UserPlus, Trash2, KeyRound,
          Eye, EyeOff, CheckCircle, AlertCircle, CreditCard,
          Wifi, FlaskConical, Mail, Send, ToggleLeft, ToggleRight,
-         Settings as SettingsIcon } from 'lucide-react';
+         Settings as SettingsIcon, Link, Unlink, Percent } from 'lucide-react';
 import api from '../services/api';
 import styles from './Settings.module.css';
+
 
 function Toast({ msg, type, onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
@@ -16,7 +17,6 @@ function Toast({ msg, type, onClose }) {
     </div>
   );
 }
-
 function PasswordStrength({ password }) {
   if (!password) return null;
   let score = 0;
@@ -36,6 +36,7 @@ function PasswordStrength({ password }) {
         ))}
       </div>
       <div style={{fontSize:10,color:colors[score],fontFamily:'var(--font-mono)'}}>{labels[score]}</div>
+
     </div>
   );
 }
@@ -200,6 +201,7 @@ function PaymentProviderCard({ provider, saving, onSave }) {
           )}
         </div>
       )}
+
     </div>
   );
 }
@@ -220,6 +222,15 @@ export default function Settings() {
   const [creating, setCreating] = useState(false);
 
   const isSuperAdmin = admin?.role === 'super_admin';
+
+  // Host assignments state
+  const [allAPs,       setAllAPs]       = useState([]);
+  const [siteManagers, setSiteManagers] = useState([]);
+  const [assignments,  setAssignments]  = useState([]);
+  const [assignAP,     setAssignAP]     = useState('');
+  const [assignAdmin,  setAssignAdmin]  = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [shareEdits,   setShareEdits]   = useState({});
 
   // Payment providers state
   const [payProviders,    setPayProviders]    = useState([]);
@@ -254,15 +265,27 @@ export default function Settings() {
 
   const loadAdmins = () => {
     api.get('/auth/admins')
-      .then(res => setAdmins(res.data))
+      .then(res => setAdmins(Array.isArray(res.data) ? res.data : (res.data.admins || [])))
       .catch(console.error);
+  };
+
+  const loadHosts = () => {
+    api.get('/hosts/assignments').then(r => setAssignments(r.data.assignments || [])).catch(console.error);
+    // Use DB APs (always populated) instead of live Omada fetch
+    api.get('/hosts/my-aps').then(r => setAllAPs(r.data.aps || [])).catch(console.error);
+    // /auth/admins returns a plain array (not {admins:[]})
+    api.get('/auth/admins').then(r => {
+      const list = Array.isArray(r.data) ? r.data : (r.data.admins || []);
+      setSiteManagers(list.filter(a => a.role === 'site_manager'));
+    }).catch(console.error);
   };
 
   useEffect(() => {
     if (isSuperAdmin) {
       loadAdmins();
       loadPayProviders();
-    loadSmtpConfig();
+      loadSmtpConfig();
+      loadHosts();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -318,7 +341,6 @@ export default function Settings() {
       await api.put(`/payment/providers/${id}`, updates);
       showToast('Payment provider updated ✅', 'success');
       loadPayProviders();
-    loadSmtpConfig();
     } catch(e) {
       showToast(e.response?.data?.error || 'Failed to update provider', 'error');
     }
@@ -331,8 +353,7 @@ export default function Settings() {
       const updates = Object.entries(smtpEdits).map(([key, value]) => ({ key, value }));
       await api.put('/payment/config', { updates });
       showToast('Email config saved ✅', 'success');
-      loadPayProviders();
-    loadSmtpConfig();
+      loadSmtpConfig();
     } catch(e) {
       showToast(e.response?.data?.error || 'Failed to save SMTP config', 'error');
     }
@@ -353,6 +374,44 @@ export default function Settings() {
     setSmtpTesting(false);
   }
 
+  async function handleAssign() {
+    if (!assignAP || !assignAdmin) return;
+    setAssignSaving(true);
+    try {
+      await api.post('/hosts/assignments', { admin_id: assignAdmin, ap_mac: assignAP });
+      showToast('Assignment saved ✅', 'success');
+      loadHosts();
+      setAssignAP(''); setAssignAdmin('');
+    } catch(e) {
+      showToast(e.response?.data?.error || 'Failed to assign', 'error');
+    }
+    setAssignSaving(false);
+  }
+
+  async function handleUnassign(adminId, apMac) {
+    try {
+      await api.delete('/hosts/assignments', { data: { admin_id: adminId, ap_mac: apMac } });
+      showToast('Assignment removed', 'success');
+      loadHosts();
+    } catch {
+      showToast('Failed to remove assignment', 'error');
+    }
+  }
+
+  async function handleShareSave(mac) {
+    const pct = parseFloat(shareEdits[mac]);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      showToast('Share must be between 0 and 100', 'error'); return;
+    }
+    try {
+      await api.put(`/hosts/ap/${mac}`, { revenue_share_pct: pct });
+      showToast('Revenue share updated ✅', 'success');
+      loadHosts();
+    } catch {
+      showToast('Failed to update share', 'error');
+    }
+  }
+
   function showToast(msg, type) { setToast({ msg, type }); }
 
   const tabs = [
@@ -360,6 +419,7 @@ export default function Settings() {
     ...(isSuperAdmin ? [{ key: 'admins',  label: 'Admin Accounts', icon: ShieldCheck }] : []),
     ...(isSuperAdmin ? [{ key: 'providers', label: 'Payment Gateways', icon: CreditCard }] : []),
     ...(isSuperAdmin ? [{ key: 'email',   label: 'Email Config',   icon: Mail        }] : []),
+    ...(isSuperAdmin ? [{ key: 'hosts',   label: 'Host Assignments', icon: Link        }] : []),
   ];
 
   return (
@@ -623,6 +683,77 @@ export default function Settings() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === 'hosts' && isSuperAdmin && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Assign Hosts to Access Points</div>
+          <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 20 }}>
+            Link site_manager accounts to specific APs. Each host sees only their assigned APs and revenue.
+          </p>
+
+          {/* New assignment */}
+          <div className={styles.formCard}>
+            <div className={styles.twoCol}>
+              <div className={styles.formRow}>
+                <label className={styles.formLabel}>Access Point</label>
+                <select className={styles.formSelect} value={assignAP} onChange={e => setAssignAP(e.target.value)}>
+                  <option value="">Select AP…</option>
+                  {allAPs.map(ap => (
+                    <option key={ap.mac} value={ap.mac}>{ap.name || ap.mac} ({ap.mac})</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formRow}>
+                <label className={styles.formLabel}>Host Admin</label>
+                <select className={styles.formSelect} value={assignAdmin} onChange={e => setAssignAdmin(e.target.value)}>
+                  <option value="">Select host admin…</option>
+                  {siteManagers.map(a => (
+                    <option key={a.id} value={a.id}>{a.username} ({a.email})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <button className={styles.saveBtn} onClick={handleAssign} disabled={assignSaving || !assignAP || !assignAdmin}>
+              <Link size={13}/> {assignSaving ? 'Saving…' : 'Assign Host'}
+            </button>
+          </div>
+
+          {/* Current assignments */}
+          <div className={styles.sectionTitle} style={{ marginTop: 24 }}>Current Assignments</div>
+          {assignments.length === 0 && (
+            <p style={{ color: 'var(--text3)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No assignments yet.</p>
+          )}
+          {assignments.map((a, i) => (
+            <div key={i} className={styles.adminRow} style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{a.username}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)' }}>
+                  {a.ap_name || a.ap_mac} · {a.ap_mac}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Percent size={12} color="var(--text3)"/>
+                <input
+                  className={styles.formInput}
+                  style={{ width: 60, textAlign: 'center', padding: '4px 8px' }}
+                  type="number" min="0" max="100"
+                  defaultValue={a.revenue_share_pct ?? 70}
+                  onChange={e => setShareEdits(s => ({ ...s, [a.ap_mac]: e.target.value }))}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>% host share</span>
+                <button
+                  onClick={() => handleShareSave(a.ap_mac)}
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text2)', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                  Save
+                </button>
+              </div>
+              <button className={styles.deleteAdminBtn} onClick={() => handleUnassign(a.admin_id, a.ap_mac)} title="Remove">
+                <Unlink size={13}/>
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
