@@ -237,3 +237,17 @@ safeAlter('ALTER TABLE access_points ADD COLUMN host_phone TEXT');
 
 // Ensure sessions has ap_mac (may already exist)
 safeAlter('ALTER TABLE sessions ADD COLUMN ap_mac TEXT');
+
+// ── Roaming support ───────────────────────────────────────────
+// Append-only log of cross-AP session movements — never modifies sessions.ap_mac
+// so host revenue attribution is always preserved to the originating AP
+db.exec(`
+  CREATE TABLE IF NOT EXISTS session_roam_log (
+    id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    session_id  TEXT NOT NULL REFERENCES sessions(id),
+    from_ap_mac TEXT,
+    to_ap_mac   TEXT,
+    roamed_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
+db.prepare('CREATE INDEX IF NOT EXISTS idx_roam_session ON session_roam_log(session_id)').run();

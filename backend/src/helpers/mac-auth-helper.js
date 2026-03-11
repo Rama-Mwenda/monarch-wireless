@@ -103,4 +103,73 @@ async function deauthorizeSession(sessionId) {
   await omada.deauthorizeClient(session.client_mac);
 }
 
-module.exports = { authorizeSession, deauthorizeSession };
+
+/**
+ * Called when a client associates with a NEW AP but already has a valid session.
+ * Re-authorizes them with Omada on the new AP WITHOUT modifying the session's
+ * ap_mac (preserving revenue attribution to the originating host).
+ *
+ * @param {object} opts
+ *   clientMac  - client device MAC
+ *   newApMac   - the AP they've just roamed onto
+ *   ssidName   - SSID name
+ *   radioId    - radio id
+ *   site       - Omada site name
+ * @returns { found, success, sessionId, remainingMinutes }
+ */
+async function reauthorizeRoamingSession({
+  clientMac, newApMac, ssidName, radioId, site,
+}) {
+  const normMac = omada.normaliseMac(clientMac);
+
+  // Find an active, unexpired session for this device
+  // NOTE: we do NOT filter by ap_mac — intentional, this is the roaming check
+  const session = db.prepare(`
+    SELECT s.*, p.duration_minutes, p.device_limit
+    FROM sessions s
+    JOIN packages p ON s.package_id = p.id
+    WHERE s.client_mac = ?
+      AND s.status = 'active'
+      AND s.end_at > datetime('now')
+    ORDER BY s.end_at DESC
+    LIMIT 1
+  `).get(normMac);
+
+  if (!session) return { found: false };
+
+  // Calculate remaining duration in minutes for Omada
+  const remaining = Math.max(
+    1,
+    Math.round((new Date(session.end_at) - Date.now()) / 60000)
+  );
+
+  // Re-authorize with Omada on the NEW AP — do NOT update session.ap_mac
+  const omadaResult = await omada.authorizeClient({
+    clientMac: normMac,
+    apMac:     newApMac,
+    ssidName,
+    radioId,
+    site,
+    durationMinutes: remaining,
+  });
+
+  // Log the roam event (non-destructive — separate table)
+  try {
+    db.prepare(`
+      INSERT INTO session_roam_log (session_id, from_ap_mac, to_ap_mac, roamed_at)
+      VALUES (?, ?, ?, datetime('now'))
+    `).run(session.id, session.ap_mac, newApMac);
+  } catch {
+    // Table may not exist yet — non-fatal, just skip logging
+  }
+
+  return {
+    found:            true,
+    success:          omadaResult.success,
+    sessionId:        session.id,
+    remainingMinutes: remaining,
+    omada:            omadaResult,
+  };
+}
+
+module.exports = { authorizeSession, deauthorizeSession, reauthorizeRoamingSession };

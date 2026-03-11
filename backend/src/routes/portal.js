@@ -159,4 +159,57 @@ router.post('/vouchers/redeem', (req, res) => {
   });
 });
 
+
+// ── GET /portal/check-session?mac=XX:XX:XX — PUBLIC
+// Called by captive portal on page load to check if device has an active session.
+// Used for roaming: if session exists on a different AP, re-authorize on this one.
+// Revenue attribution is NEVER changed — ap_mac on the session stays as the
+// originating AP so host revenue reporting remains accurate.
+router.get('/check-session', async (req, res) => {
+  const { mac, ap_mac, ssid_name, radio_id } = req.query;
+  if (!mac) return res.status(400).json({ error: 'mac required' });
+
+  const normMac = mac.toLowerCase().replace(/[^0-9a-f]/g, '').replace(/(..)/g, '$1:').slice(0, 17);
+
+  const session = db.prepare(`
+    SELECT s.*, p.name as package_name, p.duration_minutes
+    FROM sessions s
+    JOIN packages p ON s.package_id = p.id
+    WHERE s.client_mac = ?
+      AND s.status = 'active'
+      AND s.end_at > datetime('now')
+    ORDER BY s.end_at DESC
+    LIMIT 1
+  `).get(normMac);
+
+  if (!session) {
+    return res.json({ active: false });
+  }
+
+  const remainingMinutes = Math.max(
+    1, Math.round((new Date(session.end_at) - Date.now()) / 60000)
+  );
+
+  // If they're on a different AP than the one that sold the session, re-authorize
+  // silently — no new session, no revenue change, just Omada auth on new AP
+  if (ap_mac && session.ap_mac && ap_mac !== session.ap_mac) {
+    macAuth.reauthorizeRoamingSession({
+      clientMac: normMac,
+      newApMac:  ap_mac,
+      ssidName:  ssid_name || null,
+      radioId:   radio_id  ? parseInt(radio_id) : null,
+      site:      process.env.OMADA_SITE_NAME,
+    }).catch(e => console.error('Roam re-auth error:', e.message));
+    // Non-blocking — respond immediately, re-auth happens in background
+  }
+
+  return res.json({
+    active:           true,
+    package_name:     session.package_name,
+    end_at:           session.end_at,
+    remaining_minutes: remainingMinutes,
+    roaming:          !!(ap_mac && session.ap_mac && ap_mac !== session.ap_mac),
+  });
+});
+
 module.exports = router;
