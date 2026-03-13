@@ -852,7 +852,7 @@
       if (radioId)  params.set('radio_id',  radioId);
 
       const res  = await fetch(
-        `http://${window.location.host}/portal/check-session?${params}`,
+        `https://${window.location.host}/portal/check-session?${params}`,
         { signal: AbortSignal.timeout(4000) }   // don't block portal for >4s
       );
       const data = await res.json();
@@ -909,7 +909,7 @@
     }
 
     try {
-      const url = `http://${window.location.host}/portal/packages`;
+      const url = `https://${window.location.host}/portal/packages`;
       console.log('[Portal] Fetching:', url);
       const res  = await fetch(url);
       console.log('[Portal] Response status:', res.status);
@@ -1019,7 +1019,7 @@
     startCountdown();
 
     try {
-      const res = await fetch(`http://${window.location.host}/api/mpesa/stk-push`, {
+      const res = await fetch(`https://${window.location.host}/api/mpesa/stk-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, package_id: selectedPkg.id, ...getOmadaParams() })
@@ -1046,7 +1046,7 @@
   function startPolling() {
     pollTimer = setInterval(async () => {
       try {
-        const res  = await fetch(`http://${window.location.host}/api/mpesa/status/${checkoutId}`);
+        const res  = await fetch(`https://${window.location.host}/api/mpesa/status/${checkoutId}`);
         const data = await res.json();
 
         if (data.status === 'success') {
@@ -1093,7 +1093,7 @@
 
   async function lookupVoucher(code) {
     try {
-      const res  = await fetch(`http://${window.location.host}/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
+      const res  = await fetch(`https://${window.location.host}/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
       const data = await res.json();
       if (res.ok && data.voucher) {
         voucherData = data.voucher;
@@ -1116,7 +1116,7 @@
     hideError('voucher');
 
     try {
-      const res  = await fetch(`http://${window.location.host}/portal/vouchers/redeem`, {
+      const res  = await fetch(`https://${window.location.host}/portal/vouchers/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, ...getOmadaParams() })
