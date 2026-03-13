@@ -778,6 +778,25 @@
       </button>
     </div>
 
+
+    <!-- ── ALREADY CONNECTED SCREEN ── -->
+    <div class="status-screen" id="screen-active">
+      <div class="status-icon icon-success">📶</div>
+      <div class="status-title" style="color:var(--green)">Already Connected</div>
+      <div class="status-sub" id="active-sub">Your session is still active.</div>
+      <div class="session-info" id="active-session-info">
+        <div class="session-row"><span>Package</span><span id="active-pkg">—</span></div>
+        <div class="session-row"><span>Expires</span><span id="active-expires">—</span></div>
+        <div class="session-row"><span id="active-roam-label" style="display:none;color:var(--accent)">Roaming</span><span id="active-roam-val" style="color:var(--accent)"></span></div>
+      </div>
+      <button class="btn-done" onclick="window.location.href=getOmadaParams().redirectUrl">
+        Continue Browsing →
+      </button>
+      <button class="btn-retry" style="margin-top:8px" onclick="dismissActiveSession()">
+        Buy New Package
+      </button>
+    </div>
+
     <!-- ── FAILED SCREEN ── -->
     <div class="status-screen" id="screen-failed">
       <div class="status-icon icon-failed">✕</div>
@@ -806,7 +825,80 @@
   let voucherData  = null;
 
   // ── Boot ──
-  window.addEventListener('DOMContentLoaded', loadPackages);
+  window.addEventListener('DOMContentLoaded', checkSession);
+
+  // ── Check for existing active session (roaming support) ──
+  // Fires on every portal page load. If the device already has a valid session
+  // (even one purchased on a different AP) we show the active screen and
+  // trigger a background re-auth with Omada on the current AP.
+  // Revenue attribution is never changed — the originating host keeps the sale.
+  async function checkSession() {
+    if (window.location.protocol === 'file:') {
+      loadPackages();
+      return;
+    }
+
+    const { mac, apMac, ssidName, radioId } = getOmadaParams();
+    if (!mac) {
+      // No MAC in URL — can't check, go straight to payment
+      loadPackages();
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({ mac });
+      if (apMac)    params.set('ap_mac',    apMac);
+      if (ssidName) params.set('ssid_name', ssidName);
+      if (radioId)  params.set('radio_id',  radioId);
+
+      const res  = await fetch(
+        `http://${window.location.host}/portal/check-session?${params}`,
+        { signal: AbortSignal.timeout(4000) }   // don't block portal for >4s
+      );
+      const data = await res.json();
+
+      if (res.ok && data.active) {
+        showActiveSession(data);
+        return;   // stop here — don't load packages or show payment UI
+      }
+    } catch(e) {
+      // Timeout or network error — fail open, go to payment screen
+      console.warn('[Portal] check-session failed, proceeding to payment:', e.message);
+    }
+
+    // No active session — load packages and show normal payment UI
+    loadPackages();
+  }
+
+  function showActiveSession(data) {
+    // Populate the active session screen
+    document.getElementById('active-pkg').textContent =
+      data.package_name || '—';
+
+    const expiresAt = data.end_at ? new Date(data.end_at) : null;
+    document.getElementById('active-expires').textContent =
+      expiresAt ? expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+    const remaining = data.remaining_minutes || 0;
+    document.getElementById('active-sub').textContent =
+      remaining >= 60
+        ? `You have ${Math.floor(remaining/60)}h ${remaining%60}m remaining on this session.`
+        : `You have ${remaining} minute${remaining !== 1 ? 's' : ''} remaining on this session.`;
+
+    // Show roaming badge if they've crossed onto a different AP
+    if (data.roaming) {
+      document.getElementById('active-roam-label').style.display = '';
+      document.getElementById('active-roam-val').textContent     = 'Re-authorised on this network ✓';
+    }
+
+    showScreen('active');
+  }
+
+  // User taps "Buy New Package" — dismiss active screen and show payment UI
+  function dismissActiveSession() {
+    showScreen('form');
+    loadPackages();
+  }
 
   async function loadPackages() {
     const grid = document.getElementById('pkg-grid');
@@ -817,7 +909,7 @@
     }
 
     try {
-      const url = `/portal/packages`;
+      const url = `http://${window.location.host}/portal/packages`;
       console.log('[Portal] Fetching:', url);
       const res  = await fetch(url);
       console.log('[Portal] Response status:', res.status);
@@ -927,7 +1019,7 @@
     startCountdown();
 
     try {
-      const res = await fetch(`${window.location.origin}/api/mpesa/stk-push`, {
+      const res = await fetch(`http://${window.location.host}/api/mpesa/stk-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, package_id: selectedPkg.id, ...getOmadaParams() })
@@ -954,7 +1046,7 @@
   function startPolling() {
     pollTimer = setInterval(async () => {
       try {
-        const res  = await fetch(`${window.location.origin}/api/mpesa/status/${checkoutId}`);
+        const res  = await fetch(`http://${window.location.host}/api/mpesa/status/${checkoutId}`);
         const data = await res.json();
 
         if (data.status === 'success') {
@@ -1001,7 +1093,7 @@
 
   async function lookupVoucher(code) {
     try {
-      const res  = await fetch(`${window.location.origin}/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
+      const res  = await fetch(`http://${window.location.host}/portal/vouchers/lookup?code=${encodeURIComponent(code)}`);
       const data = await res.json();
       if (res.ok && data.voucher) {
         voucherData = data.voucher;
@@ -1024,7 +1116,7 @@
     hideError('voucher');
 
     try {
-      const res  = await fetch(`${window.location.origin}/portal/vouchers/redeem`, {
+      const res  = await fetch(`http://${window.location.host}/portal/vouchers/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, ...getOmadaParams() })
