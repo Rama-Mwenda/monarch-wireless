@@ -13,6 +13,8 @@ import HostDashboard from './pages/HostDashboard';
 import HostPricing from './pages/HostPricing';
 import Network from './pages/Network';
 import Reports from './pages/Reports';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Wraps Layout — redirects if role not allowed
 function LayoutGuard({ allow }) {
@@ -41,6 +43,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Super admin routes — path prefix "/" */}
           <Route element={<LayoutGuard allow={['super_admin']} />}>
