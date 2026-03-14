@@ -144,7 +144,7 @@ function getMailConfig() {
     cfg = Object.fromEntries(rows.map(r => [r.key, r.value]));
   } catch {}
   return {
-    host:     cfg.smtp_host || process.env.SMTP_HOST || 'portal.monarchdesigners.co.ke',
+    host:     cfg.smtp_host || process.env.SMTP_HOST || 'srv-de01.kickhost.com',
     port:     Number(cfg.smtp_port || process.env.SMTP_PORT || 465),
     user:     cfg.smtp_user || process.env.SMTP_USER || '',
     pass:     cfg.smtp_pass || process.env.SMTP_PASS || '',
