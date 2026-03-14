@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   package_id      TEXT NOT NULL REFERENCES packages(id),
   voucher_id      TEXT REFERENCES vouchers(id),
   mac_address     TEXT,
-  payment_method  TEXT NOT NULL CHECK (payment_method IN ('mpesa','voucher','loyalty','free')),
+  payment_method  TEXT NOT NULL CHECK (payment_method IN ('mpesa','voucher','loyalty','free','kopokopo')),
   amount_paid     REAL NOT NULL DEFAULT 0,
   mpesa_ref       TEXT,
   loyalty_points_earned INTEGER NOT NULL DEFAULT 0,
@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS mpesa_transactions (
   ap_mac            TEXT,
   ssid_name         TEXT,
   radio_id          INTEGER
+  provider          TEXT,
 );
 
 -- ------------------------------------------------------------

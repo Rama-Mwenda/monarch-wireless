@@ -40,6 +40,7 @@ safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN client_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ap_mac TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN ssid_name TEXT');
 safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN radio_id INTEGER');
+safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN provider TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN reset_token TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN reset_token_expires TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN phone TEXT');
@@ -239,8 +240,6 @@ safeAlter('ALTER TABLE access_points ADD COLUMN host_phone TEXT');
 safeAlter('ALTER TABLE sessions ADD COLUMN ap_mac TEXT');
 
 // ── Roaming support ───────────────────────────────────────────
-// Append-only log of cross-AP session movements — never modifies sessions.ap_mac
-// so host revenue attribution is always preserved to the originating AP
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_roam_log (
     id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
