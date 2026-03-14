@@ -151,8 +151,8 @@ CREATE TABLE IF NOT EXISTS mpesa_transactions (
   client_mac        TEXT,
   ap_mac            TEXT,
   ssid_name         TEXT,
-  radio_id          INTEGER
-  provider          TEXT,
+  radio_id          INTEGER,
+  provider          TEXT
 );
 
 -- ------------------------------------------------------------
