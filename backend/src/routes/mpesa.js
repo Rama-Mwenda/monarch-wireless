@@ -33,9 +33,7 @@ router.post('/stk-push', async (req, res) => {
   const normPhone = mpesa.normalisePhone(phone);
   let user = db.prepare('SELECT * FROM users WHERE phone = ?').get(normPhone);
   if (!user) {
-    db.prepare(`
-      INSERT INTO users (phone) VALUES (?)
-    `).run(normPhone);
+    db.prepare(`INSERT INTO users (phone) VALUES (?)`).run(normPhone);
     user = db.prepare('SELECT * FROM users WHERE phone = ?').get(normPhone);
   }
 
@@ -61,7 +59,6 @@ router.post('/stk-push', async (req, res) => {
         reference:   'MONARCH',
       });
 
-      // K2 returns a payment ID from location header
       const checkoutId = result.paymentId || result.location;
 
       db.prepare(`
@@ -126,7 +123,6 @@ router.post('/stk-push', async (req, res) => {
 router.get('/status/:checkoutId', async (req, res) => {
   const { checkoutId } = req.params;
 
-  // Check our DB first
   const txn = db.prepare(`
     SELECT t.*, p.name as package_name, p.duration_minutes
     FROM mpesa_transactions t
@@ -136,24 +132,24 @@ router.get('/status/:checkoutId', async (req, res) => {
 
   if (!txn) return res.status(404).json({ error: 'Transaction not found' });
 
-  // If already resolved, return it
-  if (txn.status === 'success') {
-    return res.json({ status: 'success', txn });
-  }
+  if (txn.status === 'success') return res.json({ status: 'success', txn });
   if (txn.status === 'failed' || txn.status === 'cancelled') {
     return res.json({ status: txn.status, txn });
   }
 
-  // Still pending — query Safaricom directly
+  // Still pending — query provider directly
   try {
+    if (txn.provider === 'kopokopo') {
+      // For KopoKopo, just return pending — callback will arrive
+      return res.json({ status: 'pending', message: 'Waiting for payment confirmation' });
+    }
+
     const result = await mpesa.stkQuery(checkoutId);
     const code = parseInt(result.ResultCode);
 
     if (code === 0) {
-      // Already succeeded but callback might not have arrived yet
       return res.json({ status: 'success', txn });
     } else if (code === 1032) {
-      // Cancelled by user
       db.prepare(`UPDATE mpesa_transactions SET status='cancelled', result_code=?, result_desc=?, completed_at=datetime('now') WHERE checkout_request_id=?`)
         .run(code, result.ResultDesc, checkoutId);
       return res.json({ status: 'cancelled', message: result.ResultDesc });
@@ -161,50 +157,69 @@ router.get('/status/:checkoutId', async (req, res) => {
       return res.json({ status: 'pending', message: 'Waiting for payment confirmation' });
     }
   } catch (err) {
-    // Query endpoint can return errors for still-pending transactions — that's fine
     return res.json({ status: 'pending', message: 'Waiting for payment confirmation' });
   }
 });
 
-// ── POST /api/mpesa/callback ─────────────────────────────────
-// Safaricom calls this after payment completes — NO auth required
-router.post('/callback', async (req, res) => {
-  console.log('M-Pesa callback received:', JSON.stringify(req.body, null, 2));
+// ── POST /api/mpesa/verify/:checkoutId ───────────────────────
+// "Already Paid?" manual verification — queries provider directly
+// Called when customer has paid but callback hasn't arrived yet
+router.post('/verify/:checkoutId', async (req, res) => {
+  const { checkoutId } = req.params;
 
-  // Always respond 200 immediately to Safaricom
-  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  const txn = db.prepare(`
+    SELECT t.*, p.name as package_name, p.duration_minutes,
+           p.loyalty_points, p.price as pkg_price
+    FROM mpesa_transactions t
+    LEFT JOIN packages p ON t.package_id = p.id
+    WHERE t.checkout_request_id = ?
+  `).get(checkoutId);
 
+  if (!txn) return res.status(404).json({ error: 'Transaction not found' });
+
+  // Already processed — return existing session
+  if (txn.status === 'success') {
+    return res.json({ status: 'success', already_processed: true, txn });
+  }
+
+  if (txn.status === 'failed' || txn.status === 'cancelled') {
+    return res.json({ status: txn.status, message: 'Payment was not completed' });
+  }
+
+  // Query KopoKopo directly for payment status
   try {
-    const cb = mpesa.parseCallback(req.body);
-    if (!cb) return;
+    if (txn.provider === 'kopokopo') {
+      const k2Status = await kopokopo.queryPayment(checkoutId);
 
-    const { resultCode, resultDesc, checkoutId, mpesaReceipt, amount, phone } = cb;
+      if (!k2Status || (k2Status.status !== 'Received' && k2Status.status !== 'Success')) {
+        return res.json({
+          status: 'pending',
+          message: 'Payment not confirmed yet. Please wait a moment or try again.'
+        });
+      }
 
-    // Load pending transaction
-    const txn = db.prepare('SELECT * FROM mpesa_transactions WHERE checkout_request_id = ?').get(checkoutId);
-    if (!txn) {
-      console.error('Callback for unknown checkout ID:', checkoutId);
-      return;
-    }
+      // Payment confirmed — process it
+      const receipt = k2Status.reference || k2Status.receipt || checkoutId;
+      const amount  = parseFloat(k2Status.amount || txn.amount);
 
-    if (resultCode === 0) {
-      // ── PAYMENT SUCCESS ──────────────────────────────────
-      console.log(`✅ Payment success: ${mpesaReceipt} KES ${amount} from ${phone}`);
+      // Guard against double processing
+      const existing = db.prepare(
+        "SELECT id FROM sessions WHERE mpesa_ref = ?"
+      ).get(receipt);
+      if (existing) {
+        return res.json({ status: 'success', already_processed: true, txn });
+      }
 
-      // Update transaction
+      // Mark transaction success
       db.prepare(`
         UPDATE mpesa_transactions SET
           status = 'success',
           mpesa_receipt = ?,
           result_code = 0,
-          result_desc = ?,
+          result_desc = 'Verified via manual check',
           completed_at = datetime('now')
         WHERE checkout_request_id = ?
-      `).run(mpesaReceipt, resultDesc, checkoutId);
-
-      // Load package
-      const pkg = db.prepare('SELECT * FROM packages WHERE id = ?').get(txn.package_id);
-      if (!pkg) return;
+      `).run(receipt, checkoutId);
 
       // Get or create user
       let user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
@@ -213,47 +228,40 @@ router.post('/callback', async (req, res) => {
         user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
       }
 
-      // Create session
+      const pkg = db.prepare('SELECT * FROM packages WHERE id = ?').get(txn.package_id);
+      if (!pkg) return res.status(500).json({ error: 'Package not found' });
+
       const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
-      db.prepare(`
+
+      const sessionResult = db.prepare(`
         INSERT INTO sessions
-          (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref, loyalty_points_earned, end_at)
-        VALUES (?, ?, ?, 'mpesa', ?, ?, ?, ?)
+          (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref,
+           loyalty_points_earned, end_at, client_mac, ap_mac, ssid_name, radio_id)
+        VALUES (?, ?, ?, 'kopokopo', ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        user.id,
-        txn.site_id,
-        pkg.id,
-        amount || txn.amount,
-        mpesaReceipt,
-        pkg.loyalty_points || 0,
-        endAt,
+        user.id, txn.site_id, pkg.id,
+        amount, receipt, pkg.loyalty_points || 0, endAt,
+        txn.client_mac || null, txn.ap_mac || null,
+        txn.ssid_name || null, txn.radio_id || null
       );
 
-      // Update user stats + tier
-      const newSpent    = (user.total_spent || 0) + (amount || txn.amount);
+      // Update user stats
+      const newSpent    = (user.total_spent    || 0) + amount;
       const newSessions = (user.total_sessions || 0) + 1;
       const newPoints   = (user.loyalty_points || 0) + (pkg.loyalty_points || 0);
-      const newPunch    = (user.punch_count || 0) + 1;
-      const newTier     = calcTier(newSpent);
+      const newPunch    = (user.punch_count    || 0) + 1;
 
       db.prepare(`
         UPDATE users SET
-          total_spent    = ?,
-          total_sessions = ?,
-          loyalty_points = ?,
-          punch_count    = ?,
-          tier           = ?,
-          last_seen      = datetime('now')
+          total_spent = ?, total_sessions = ?, loyalty_points = ?,
+          punch_count = ?, tier = ?, last_seen = datetime('now')
         WHERE id = ?
-      `).run(newSpent, newSessions, newPoints, newPunch, newTier, user.id);
-
-      console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
+      `).run(newSpent, newSessions, newPoints, newPunch, calcTier(newSpent), user.id);
 
       // Authorize MAC with Omada (non-blocking)
-      // clientMac stored on transaction from STK push initiation
       if (txn.client_mac) {
         macAuth.authorizeSession({
-          sessionId:       sessionId,
+          sessionId:       sessionResult.lastInsertRowid,
           userId:          user.id,
           packageId:       pkg.id,
           clientMac:       txn.client_mac,
@@ -265,32 +273,136 @@ router.post('/callback', async (req, res) => {
         }).catch(e => console.error('MAC auth error:', e.message));
       }
 
-      // Punchcard check (non-blocking)
+      // Punchcard + SMS (non-blocking)
       if (txn.phone && !txn.phone.startsWith('mac:')) {
         punchcard.checkPunchcard(user.id, txn.phone).catch(console.error);
-      }
-
-      // Send confirmation SMS (non-blocking)
-      if (!txn.phone.startsWith('mac:')) {
         sms.sessionStarted({
           phone:       txn.phone,
           packageName: pkg.name,
           duration:    sms.fmtDuration(pkg.duration_minutes),
           expiresAt:   endAt,
-          receipt:     mpesaReceipt,
+          receipt,
+        }).catch(console.error);
+      }
+
+      console.log(`✅ Manual verify success: ${receipt} KES ${amount} from ${txn.phone}`);
+
+      // Return updated txn for portal success screen
+      const updatedTxn = db.prepare(`
+        SELECT t.*, p.name as package_name, p.duration_minutes
+        FROM mpesa_transactions t
+        LEFT JOIN packages p ON t.package_id = p.id
+        WHERE t.checkout_request_id = ?
+      `).get(checkoutId);
+
+      return res.json({ status: 'success', txn: { ...updatedTxn, end_at: endAt, mpesa_receipt: receipt } });
+
+    } else {
+      // M-Pesa — query Daraja
+      const result = await mpesa.stkQuery(checkoutId);
+      const code = parseInt(result.ResultCode);
+
+      if (code === 0) {
+        return res.json({ status: 'success', txn });
+      } else {
+        return res.json({
+          status: 'pending',
+          message: 'Payment not confirmed yet. Please wait a moment.'
+        });
+      }
+    }
+
+  } catch (err) {
+    console.error('Verify error:', err.message);
+    return res.json({
+      status: 'pending',
+      message: 'Could not verify payment right now. Please wait a moment.'
+    });
+  }
+});
+
+// ── POST /api/mpesa/callback ─────────────────────────────────
+router.post('/callback', async (req, res) => {
+  console.log('M-Pesa callback received:', JSON.stringify(req.body, null, 2));
+  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+
+  try {
+    const cb = mpesa.parseCallback(req.body);
+    if (!cb) return;
+
+    const { resultCode, resultDesc, checkoutId, mpesaReceipt, amount, phone } = cb;
+
+    const txn = db.prepare('SELECT * FROM mpesa_transactions WHERE checkout_request_id = ?').get(checkoutId);
+    if (!txn) {
+      console.error('Callback for unknown checkout ID:', checkoutId);
+      return;
+    }
+
+    if (resultCode === 0) {
+      console.log(`✅ Payment success: ${mpesaReceipt} KES ${amount} from ${phone}`);
+
+      db.prepare(`
+        UPDATE mpesa_transactions SET
+          status = 'success', mpesa_receipt = ?, result_code = 0,
+          result_desc = ?, completed_at = datetime('now')
+        WHERE checkout_request_id = ?
+      `).run(mpesaReceipt, resultDesc, checkoutId);
+
+      const pkg = db.prepare('SELECT * FROM packages WHERE id = ?').get(txn.package_id);
+      if (!pkg) return;
+
+      let user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
+      if (!user) {
+        db.prepare('INSERT INTO users (phone) VALUES (?)').run(txn.phone);
+        user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
+      }
+
+      const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
+      db.prepare(`
+        INSERT INTO sessions
+          (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref, loyalty_points_earned, end_at)
+        VALUES (?, ?, ?, 'mpesa', ?, ?, ?, ?)
+      `).run(user.id, txn.site_id, pkg.id, amount || txn.amount, mpesaReceipt, pkg.loyalty_points || 0, endAt);
+
+      const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
+      const newSessions = (user.total_sessions || 0) + 1;
+      const newPoints   = (user.loyalty_points || 0) + (pkg.loyalty_points || 0);
+      const newPunch    = (user.punch_count    || 0) + 1;
+
+      db.prepare(`
+        UPDATE users SET total_spent=?, total_sessions=?, loyalty_points=?,
+          punch_count=?, tier=?, last_seen=datetime('now') WHERE id=?
+      `).run(newSpent, newSessions, newPoints, newPunch, calcTier(newSpent), user.id);
+
+      console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
+
+      if (txn.client_mac) {
+        macAuth.authorizeSession({
+          sessionId:       txn.id,
+          userId:          user.id,
+          packageId:       pkg.id,
+          clientMac:       txn.client_mac,
+          apMac:           txn.ap_mac,
+          ssidName:        txn.ssid_name,
+          radioId:         txn.radio_id,
+          site:            process.env.OMADA_SITE_NAME,
+          durationMinutes: pkg.duration_minutes,
+        }).catch(e => console.error('MAC auth error:', e.message));
+      }
+
+      if (txn.phone && !txn.phone.startsWith('mac:')) {
+        punchcard.checkPunchcard(user.id, txn.phone).catch(console.error);
+        sms.sessionStarted({
+          phone: txn.phone, packageName: pkg.name,
+          duration: sms.fmtDuration(pkg.duration_minutes), expiresAt: endAt, receipt: mpesaReceipt,
         }).catch(console.error);
       }
 
     } else {
-      // ── PAYMENT FAILED ───────────────────────────────────
       console.log(`❌ Payment failed (${resultCode}): ${resultDesc}`);
       db.prepare(`
-        UPDATE mpesa_transactions SET
-          status = 'failed',
-          result_code = ?,
-          result_desc = ?,
-          completed_at = datetime('now')
-        WHERE checkout_request_id = ?
+        UPDATE mpesa_transactions SET status='failed', result_code=?, result_desc=?, completed_at=datetime('now')
+        WHERE checkout_request_id=?
       `).run(resultCode, resultDesc, checkoutId);
     }
 
@@ -299,15 +411,13 @@ router.post('/callback', async (req, res) => {
   }
 });
 
-
 // ── POST /api/mpesa/k2-callback ───────────────────────────────
-// KopoKopo calls this after payment completes — NO auth required
 router.post('/k2-callback', async (req, res) => {
   console.log('KopoKopo callback received:', JSON.stringify(req.body, null, 2));
   res.json({ success: true });
 
   try {
-    const data = req.body?.data?.attributes || req.body;
+    const data      = req.body?.data?.attributes || req.body;
     const status    = data.status;
     const paymentId = data.id || req.body?.data?.id;
     const amount    = parseFloat(data.amount || data.event?.resource?.amount || 0);
@@ -319,7 +429,6 @@ router.post('/k2-callback', async (req, res) => {
       return;
     }
 
-    // Find pending transaction by payment ID
     const txn = db.prepare(
       "SELECT * FROM mpesa_transactions WHERE checkout_request_id = ? AND provider = 'kopokopo'"
     ).get(paymentId);
@@ -329,14 +438,16 @@ router.post('/k2-callback', async (req, res) => {
       return;
     }
 
-    // Mark success
+    // Guard against double processing
+    if (txn.status === 'success') {
+      console.log(`K2 callback — already processed: ${paymentId}`);
+      return;
+    }
+
     db.prepare(`
       UPDATE mpesa_transactions SET
-        status = 'success',
-        mpesa_receipt = ?,
-        result_code = 0,
-        result_desc = 'KopoKopo payment received',
-        completed_at = datetime('now')
+        status = 'success', mpesa_receipt = ?, result_code = 0,
+        result_desc = 'KopoKopo payment received', completed_at = datetime('now')
       WHERE checkout_request_id = ?
     `).run(receipt, paymentId);
 
@@ -349,6 +460,13 @@ router.post('/k2-callback', async (req, res) => {
       user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
     }
 
+    // Guard against duplicate session
+    const existingSession = db.prepare("SELECT id FROM sessions WHERE mpesa_ref = ?").get(receipt);
+    if (existingSession) {
+      console.log(`K2 callback — session already exists for receipt: ${receipt}`);
+      return;
+    }
+
     const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
     const sessionResult = db.prepare(`
       INSERT INTO sessions
@@ -356,15 +474,14 @@ router.post('/k2-callback', async (req, res) => {
       VALUES (?, ?, ?, 'kopokopo', ?, ?, ?, ?)
     `).run(user.id, txn.site_id, pkg.id, amount || txn.amount, receipt, pkg.loyalty_points || 0, endAt);
 
-    const newSpent    = (user.total_spent || 0) + (amount || txn.amount);
+    const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
     const newSessions = (user.total_sessions || 0) + 1;
     const newPoints   = (user.loyalty_points || 0) + (pkg.loyalty_points || 0);
-    const newPunch    = (user.punch_count || 0) + 1;
+    const newPunch    = (user.punch_count    || 0) + 1;
+
     db.prepare(`
-      UPDATE users SET
-        total_spent = ?, total_sessions = ?, loyalty_points = ?,
-        punch_count = ?, tier = ?, last_seen = datetime('now')
-      WHERE id = ?
+      UPDATE users SET total_spent=?, total_sessions=?, loyalty_points=?,
+        punch_count=?, tier=?, last_seen=datetime('now') WHERE id=?
     `).run(newSpent, newSessions, newPoints, newPunch, calcTier(newSpent), user.id);
 
     if (txn.client_mac) {
@@ -384,11 +501,8 @@ router.post('/k2-callback', async (req, res) => {
     if (txn.phone && !txn.phone.startsWith('mac:')) {
       punchcard.checkPunchcard(user.id, txn.phone).catch(console.error);
       sms.sessionStarted({
-        phone:       txn.phone,
-        packageName: pkg.name,
-        duration:    sms.fmtDuration(pkg.duration_minutes),
-        expiresAt:   endAt,
-        receipt,
+        phone: txn.phone, packageName: pkg.name,
+        duration: sms.fmtDuration(pkg.duration_minutes), expiresAt: endAt, receipt,
       }).catch(console.error);
     }
 
@@ -400,9 +514,7 @@ router.post('/k2-callback', async (req, res) => {
 });
 
 // ── GET /api/mpesa/transactions ──────────────────────────────
-// Admin view of all M-Pesa transactions
 router.get('/transactions', async (req, res) => {
-  const { requireAuth } = require('../middleware/auth');
   const txns = db.prepare(`
     SELECT t.*, p.name as package_name
     FROM mpesa_transactions t

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { MessageSquare, Settings, Send, ToggleLeft, ToggleRight,
          Eye, EyeOff, CheckCircle, AlertCircle, ChevronDown,
          ChevronUp, Megaphone, Clock } from 'lucide-react';
@@ -18,7 +18,10 @@ const PLACEHOLDERS = [
 ];
 
 function Toast({ msg, type, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [onClose]);
   return (
     <div className={`${styles.toast} ${styles[type]}`}>
       {type === 'success' ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
@@ -66,7 +69,7 @@ function ProviderCard({ provider, onSave }) {
         <div className={styles.providerActions}>
           <button
             className={`${styles.toggleBtn} ${active ? styles.toggleOn : ''}`}
-            onClick={() => { setActive(a => !a); }}
+            onClick={() => setActive(a => !a)}
             title={active ? 'Disable' : 'Enable'}>
             {active ? <ToggleRight size={22} color="var(--green)"/> : <ToggleLeft size={22} color="var(--text3)"/>}
           </button>
@@ -210,9 +213,7 @@ export default function Sms() {
   const [broadcast,  setBroadcast] = useState({ message: '', tier: '' });
   const [sending,    setSending]   = useState(false);
 
-  useEffect(() => { loadAll(); }, []);
-
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     try {
       const [p, t, l] = await Promise.all([
         api.get('/sms/providers'),
@@ -222,22 +223,24 @@ export default function Sms() {
       setProviders(p.data.providers || []);
       setTemplates(t.data.templates || []);
       setLogs(l.data.logs || []);
-    } catch(e) { console.error(e); }
-  }
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   async function saveProvider(id, data) {
     try {
       await api.put(`/sms/providers/${id}`, data);
       showToast('Provider saved!', 'success');
       loadAll();
-    } catch(e) { showToast('Save failed', 'error'); }
+    } catch { showToast('Save failed', 'error'); }
   }
 
   async function saveTemplate(id, data) {
     try {
       await api.put(`/sms/templates/${id}`, data);
       showToast('Template saved!', 'success');
-    } catch(e) { showToast('Save failed', 'error'); }
+    } catch { showToast('Save failed', 'error'); }
   }
 
   async function sendTest() {
@@ -246,7 +249,7 @@ export default function Sms() {
     try {
       const r = await api.post('/sms/test', { phone: testPhone });
       showToast(r.data.success ? 'Test SMS sent! ✅' : 'Send failed ❌', r.data.success ? 'success' : 'error');
-    } catch(e) { showToast('Test failed', 'error'); }
+    } catch { showToast('Test failed', 'error'); }
     setTesting(false);
   }
 
@@ -258,7 +261,7 @@ export default function Sms() {
       showToast(`Sent to ${r.data.sent} users ✅`, 'success');
       setBroadcast({ message: '', tier: '' });
       loadAll();
-    } catch(e) { showToast('Broadcast failed', 'error'); }
+    } catch { showToast('Broadcast failed', 'error'); }
     setSending(false);
   }
 

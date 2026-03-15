@@ -95,7 +95,7 @@ async function sendAndLog({ userId, phone, messageType, message }) {
 }
 
 // ── Templates ────────────────────────────────────────────────
-const PORTAL_URL = process.env.PORTAL_URL || 'http://192.168.0.1:3000/portal';
+const PORTAL_URL = process.env.PORTAL_URL;
 const COMPANY    = 'Monarch Wireless';
 
 function sessionStarted({ userId, phone, packageName, duration, expiresAt, receipt }) {

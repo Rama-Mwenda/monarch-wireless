@@ -86,7 +86,9 @@ router.patch('/:id',
     for (const field of fields) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(req.body[field]);
+        let val = req.body[field];
+        if (typeof val === 'boolean') val = val ? 1 : 0;
+        values.push(val);
       }
     }
 

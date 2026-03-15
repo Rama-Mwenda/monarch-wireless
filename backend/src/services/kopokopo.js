@@ -112,6 +112,45 @@ async function stkPush({ phone, amount, packageName, reference }) {
   };
 }
 
+// ── Query Payment Status ──────────────────────────────────────
+// Used by the "Already Paid?" manual verification flow
+async function queryPayment(paymentId) {
+  const cfg     = getCfg();
+  const baseUrl = getBaseUrl(cfg.env);
+  const token   = await getToken();
+
+  try {
+    const res = await axios.get(
+      `${baseUrl}/api/v1/incoming_payments/${paymentId}`,
+      {
+        headers: {
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          apiKey:         cfg.apiKey,
+        },
+      }
+    );
+
+    const data       = res.data?.data?.attributes || res.data;
+    const status     = data.status;
+    const amount     = data.event?.resource?.amount || data.amount || 0;
+    const reference  = data.event?.resource?.reference || data.reference || paymentId;
+    const phone      = data.event?.resource?.sender_phone_number || data.sender_msisdn || '';
+
+    return {
+      status,    // 'Pending', 'Received', 'Success', 'Failed'
+      amount:    parseFloat(amount),
+      reference,
+      receipt:   reference,
+      phone,
+      raw:       res.data,
+    };
+  } catch (err) {
+    console.error('KopoKopo queryPayment error:', err.response?.data || err.message);
+    return null;
+  }
+}
+
 // ── Verify callback signature ─────────────────────────────────
 function verifyCallback(req) {
   const cfg = getCfg();
@@ -128,4 +167,4 @@ function clearTokenCache() {
   tokenExpiry = 0;
 }
 
-module.exports = { stkPush, verifyCallback, clearTokenCache, getCfg, getToken };
+module.exports = { stkPush, queryPayment, verifyCallback, clearTokenCache, getCfg, getToken };

@@ -38,7 +38,6 @@
     overflow-x: hidden;
   }
 
-  /* ── Background grid ── */
   body::before {
     content: '';
     position: fixed;
@@ -51,7 +50,6 @@
     z-index: 0;
   }
 
-  /* ── Glow orb ── */
   body::after {
     content: '';
     position: fixed;
@@ -76,7 +74,6 @@
     padding: 24px 16px 40px;
   }
 
-  /* ── Header ── */
   .brand {
     display: flex;
     flex-direction: column;
@@ -145,7 +142,6 @@
   .signal-bar span:nth-child(3) { height: 13px; animation-delay: 0.3s; }
   .signal-bar span:nth-child(4) { height: 16px; animation-delay: 0.45s; }
 
-  /* ── Card ── */
   .card {
     width: 100%;
     max-width: 400px;
@@ -157,7 +153,6 @@
     animation: fadeUp 0.5s ease 0.1s both;
   }
 
-  /* ── Tabs ── */
   .tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -194,11 +189,9 @@
     border-radius: 2px 2px 0 0;
   }
 
-  /* ── Panel ── */
   .panel { display: none; padding: 28px; }
   .panel.active { display: flex; flex-direction: column; gap: 20px; }
 
-  /* ── Packages ── */
   .pkg-grid {
     display: flex;
     flex-direction: column;
@@ -264,7 +257,6 @@
     font-weight: 400;
   }
 
-  /* ── Most Popular badge ── */
   .pkg.popular {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(240,165,0,0.15);
@@ -301,12 +293,8 @@
   }
 
   @keyframes popularPulse {
-    0%, 100% {
-      box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(240,165,0,0.12);
-    }
-    50% {
-      box-shadow: 0 0 0 2px var(--accent), 0 0 28px rgba(240,165,0,0.35);
-    }
+    0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(240,165,0,0.12); }
+    50%       { box-shadow: 0 0 0 2px var(--accent), 0 0 28px rgba(240,165,0,0.35); }
   }
 
   @keyframes dotPulse {
@@ -314,7 +302,6 @@
     50%       { opacity: 0.4; transform: scale(0.6); }
   }
 
-  /* ── Form fields ── */
   .field { display: flex; flex-direction: column; gap: 7px; }
   .label {
     font-family: var(--font-m);
@@ -376,7 +363,6 @@
     padding: 16px 18px;
   }
 
-  /* ── Summary ── */
   .summary {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -408,7 +394,6 @@
     color: var(--accent);
   }
 
-  /* ── Buttons ── */
   .btn-pay {
     background: linear-gradient(135deg, #00b050, #00852c);
     border: none;
@@ -456,7 +441,6 @@
   .btn-redeem:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
   .btn-redeem:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* ── Error box ── */
   .error-box {
     background: rgba(240,64,96,0.08);
     border: 1px solid rgba(240,64,96,0.25);
@@ -470,7 +454,6 @@
   }
   .error-box.show { display: flex; }
 
-  /* ── Status screens ── */
   .status-screen {
     display: none;
     flex-direction: column;
@@ -535,6 +518,38 @@
     color: var(--text3);
   }
 
+  /* ── Rotating status message ── */
+  .waiting-status-msg {
+    font-size: 13px;
+    color: var(--text2);
+    max-width: 260px;
+    line-height: 1.6;
+    min-height: 42px;
+    transition: opacity 0.4s ease;
+  }
+
+  .waiting-status-msg.fade { opacity: 0; }
+
+  /* ── Already Paid button ── */
+  .btn-already-paid {
+    background: none;
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius);
+    color: var(--accent);
+    font-family: var(--font-d);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    display: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-already-paid.show { display: block; }
+  .btn-already-paid:hover { background: rgba(240,165,0,0.08); }
+  .btn-already-paid:disabled { opacity: 0.5; cursor: not-allowed; }
+
   .receipt-badge {
     background: rgba(13,187,133,0.08);
     border: 1px solid rgba(13,187,133,0.2);
@@ -593,7 +608,6 @@
   }
   .btn-retry:hover { border-color: var(--accent); }
 
-  /* ── Spinner ── */
   .spinner {
     width: 36px; height: 36px;
     border: 3px solid var(--border2);
@@ -602,7 +616,6 @@
     animation: spin 0.8s linear infinite;
   }
 
-  /* ── Footer ── */
   .footer {
     margin-top: 24px;
     font-family: var(--font-m);
@@ -613,7 +626,6 @@
     animation: fadeUp 0.5s ease 0.3s both;
   }
 
-  /* ── Loading skeleton ── */
   .skeleton {
     background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
     background-size: 200% 100%;
@@ -622,14 +634,12 @@
     height: 62px;
   }
 
-  /* ── Animations ── */
   @keyframes fadeUp   { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
   @keyframes spin     { to { transform: rotate(360deg); } }
   @keyframes pulse    { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
   @keyframes shimmer  { to { background-position: -200% 0; } }
 
-  /* ── Mobile tweaks ── */
   @media (max-width: 420px) {
     .panel { padding: 20px; }
     .brand-name { font-size: 20px; }
@@ -640,7 +650,6 @@
 
 <div class="wrap">
 
-  <!-- Brand header -->
   <div class="brand">
     <div class="logo-mark">M</div>
     <div class="signal-bar">
@@ -650,10 +659,8 @@
     <div class="brand-sub">Designers Hotspot · Nairobi</div>
   </div>
 
-  <!-- Main card -->
   <div class="card" id="main-card">
 
-    <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" onclick="switchTab('mpesa')" id="tab-mpesa">📱 M-Pesa</button>
       <button class="tab" onclick="switchTab('voucher')" id="tab-voucher">🎫 Voucher</button>
@@ -661,8 +668,6 @@
 
     <!-- ── M-PESA PANEL ── -->
     <div class="panel active" id="panel-mpesa">
-
-      <!-- Package list -->
       <div class="field">
         <div class="label">Choose a Package</div>
         <div class="pkg-grid" id="pkg-grid">
@@ -672,7 +677,6 @@
         </div>
       </div>
 
-      <!-- Phone number -->
       <div class="field">
         <div class="label">M-Pesa Phone Number</div>
         <div class="phone-row">
@@ -683,28 +687,22 @@
         </div>
       </div>
 
-      <!-- Error -->
       <div class="error-box" id="mpesa-error">
         <span>⚠</span><span id="mpesa-error-msg"></span>
       </div>
 
-      <!-- Summary -->
       <div class="summary" id="mpesa-summary" style="display:none">
         <div class="summary-row">
-          <span>Package</span>
-          <span id="sum-pkg">—</span>
+          <span>Package</span><span id="sum-pkg">—</span>
         </div>
         <div class="summary-row">
-          <span>Duration</span>
-          <span id="sum-dur">—</span>
+          <span>Duration</span><span id="sum-dur">—</span>
         </div>
         <div class="summary-row total">
-          <span>Total</span>
-          <span id="sum-amount">KES 0</span>
+          <span>Total</span><span id="sum-amount">KES 0</span>
         </div>
       </div>
 
-      <!-- Pay button -->
       <button class="btn-pay" id="btn-pay" disabled onclick="initiateMpesa()">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
         Send M-Pesa Prompt
@@ -722,21 +720,11 @@
         </div>
       </div>
 
-      <!-- Voucher info (shown when valid code detected) -->
       <div id="voucher-info" style="display:none">
         <div class="summary">
-          <div class="summary-row">
-            <span>Package</span>
-            <span id="v-pkg">—</span>
-          </div>
-          <div class="summary-row">
-            <span>Duration</span>
-            <span id="v-dur">—</span>
-          </div>
-          <div class="summary-row">
-            <span>Status</span>
-            <span id="v-status" style="color:var(--green)">Valid ✓</span>
-          </div>
+          <div class="summary-row"><span>Package</span><span id="v-pkg">—</span></div>
+          <div class="summary-row"><span>Duration</span><span id="v-dur">—</span></div>
+          <div class="summary-row"><span>Status</span><span id="v-status" style="color:var(--green)">Valid ✓</span></div>
         </div>
       </div>
 
@@ -759,7 +747,11 @@
         <div class="countdown-fill" id="countdown-fill"></div>
       </div>
       <div class="countdown-text" id="countdown-text">120s remaining</div>
+      <div class="waiting-status-msg" id="waiting-status-msg">Waiting for M-Pesa confirmation...</div>
       <div style="font-family:var(--font-m);font-size:11px;color:var(--text3)" id="waiting-pkg"></div>
+      <button class="btn-already-paid" id="btn-already-paid" onclick="manualVerify()">
+        ✓ Already Paid? Tap here
+      </button>
     </div>
 
     <!-- ── SUCCESS SCREEN ── -->
@@ -777,7 +769,6 @@
         Start Browsing →
       </button>
     </div>
-
 
     <!-- ── ALREADY CONNECTED SCREEN ── -->
     <div class="status-screen" id="screen-active">
@@ -812,26 +803,61 @@
 </div><!-- /wrap -->
 
 <script>
-  // ── Config — will be injected by backend ──
   const API = window.PORTAL_API || '';
 
-  // ── State ──
   let packages     = [];
   let selectedPkg  = null;
   let checkoutId   = null;
   let pollTimer    = null;
   let cdTimer      = null;
+  let msgTimer     = null;
   let countdown    = 120;
   let voucherData  = null;
+  let verifying    = false;
 
-  // ── Boot ──
+  // ── Rotating countdown messages ──────────────────────────────
+  const WAITING_MESSAGES = [
+    { at: 120, msg: 'Waiting for M-Pesa confirmation...' },
+    { at: 90,  msg: 'Almost there! Confirming your payment...' },
+    { at: 60,  msg: 'Still waiting — please enter your M-Pesa PIN if you haven\'t yet.' },
+    { at: 30,  msg: 'Taking longer than usual. If you\'ve already paid, tap the button below.' },
+    { at: 10,  msg: 'Nearly timed out. Tap "Already Paid?" below if payment went through.' },
+  ];
+
+  function updateStatusMessage() {
+    const el = document.getElementById('waiting-status-msg');
+    if (!el) return;
+
+    // Find the right message for current countdown
+    let msg = WAITING_MESSAGES[0].msg;
+    for (const m of WAITING_MESSAGES) {
+      if (countdown <= m.at) msg = m.msg;
+    }
+
+    // Only update if message changed
+    if (el.dataset.current === msg) return;
+    el.dataset.current = msg;
+
+    // Fade transition
+    el.classList.add('fade');
+    setTimeout(() => {
+      el.textContent = msg;
+      el.classList.remove('fade');
+    }, 400);
+  }
+
+  // Show "Already Paid?" button after 30 seconds
+  function updateAlreadyPaidBtn() {
+    const btn = document.getElementById('btn-already-paid');
+    if (!btn) return;
+    if (countdown <= 90) {
+      btn.classList.add('show');
+    }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', checkSession);
 
-  // ── Check for existing active session (roaming support) ──
-  // Fires on every portal page load. If the device already has a valid session
-  // (even one purchased on a different AP) we show the active screen and
-  // trigger a background re-auth with Omada on the current AP.
-  // Revenue attribution is never changed — the originating host keeps the sale.
   async function checkSession() {
     if (window.location.protocol === 'file:') {
       loadPackages();
@@ -840,7 +866,6 @@
 
     const { mac, apMac, ssidName, radioId } = getOmadaParams();
     if (!mac) {
-      // No MAC in URL — can't check, go straight to payment
       loadPackages();
       return;
     }
@@ -853,27 +878,23 @@
 
       const res  = await fetch(
         `https://${window.location.host}/portal/check-session?${params}`,
-        { signal: AbortSignal.timeout(4000) }   // don't block portal for >4s
+        { signal: AbortSignal.timeout(4000) }
       );
       const data = await res.json();
 
       if (res.ok && data.active) {
         showActiveSession(data);
-        return;   // stop here — don't load packages or show payment UI
+        return;
       }
     } catch(e) {
-      // Timeout or network error — fail open, go to payment screen
       console.warn('[Portal] check-session failed, proceeding to payment:', e.message);
     }
 
-    // No active session — load packages and show normal payment UI
     loadPackages();
   }
 
   function showActiveSession(data) {
-    // Populate the active session screen
-    document.getElementById('active-pkg').textContent =
-      data.package_name || '—';
+    document.getElementById('active-pkg').textContent = data.package_name || '—';
 
     const expiresAt = data.end_at ? new Date(data.end_at) : null;
     document.getElementById('active-expires').textContent =
@@ -885,7 +906,6 @@
         ? `You have ${Math.floor(remaining/60)}h ${remaining%60}m remaining on this session.`
         : `You have ${remaining} minute${remaining !== 1 ? 's' : ''} remaining on this session.`;
 
-    // Show roaming badge if they've crossed onto a different AP
     if (data.roaming) {
       document.getElementById('active-roam-label').style.display = '';
       document.getElementById('active-roam-val').textContent     = 'Re-authorised on this network ✓';
@@ -894,7 +914,6 @@
     showScreen('active');
   }
 
-  // User taps "Buy New Package" — dismiss active screen and show payment UI
   function dismissActiveSession() {
     showScreen('form');
     loadPackages();
@@ -915,7 +934,6 @@
       console.log('[Portal] Response status:', res.status);
       if (!res.ok) {
         const text = await res.text();
-        console.error('[Portal] Error body:', text);
         throw new Error(`HTTP ${res.status}: ${text.slice(0,100)}`);
       }
       const data = await res.json();
@@ -946,7 +964,6 @@
       grid.innerHTML = '<div style="color:var(--text2);font-size:13px">No packages available.</div>';
       return;
     }
-    // Auto-select most popular if exists, otherwise first
     const popular = packages.find(p => p.is_popular) || packages[0];
     selectedPkg = popular;
 
@@ -1009,13 +1026,24 @@
     }
   }
 
-  // ── M-Pesa STK Push ──
+  // ── M-Pesa STK Push ──────────────────────────────────────────
   async function initiateMpesa() {
     const phone = document.getElementById('mpesa-phone').value;
     hideError('mpesa');
     showScreen('waiting');
     document.getElementById('waiting-pkg').textContent =
       `${selectedPkg.name} · KES ${selectedPkg.price}`;
+
+    // Reset already paid button
+    const apBtn = document.getElementById('btn-already-paid');
+    apBtn.classList.remove('show');
+    apBtn.disabled = false;
+    apBtn.textContent = '✓ Already Paid? Tap here';
+
+    // Reset status message
+    const msgEl = document.getElementById('waiting-status-msg');
+    msgEl.dataset.current = '';
+
     startCountdown();
 
     try {
@@ -1043,6 +1071,48 @@
     }
   }
 
+  // ── Manual "Already Paid?" verification ──────────────────────
+  async function manualVerify() {
+    if (!checkoutId || verifying) return;
+    verifying = true;
+
+    const btn = document.getElementById('btn-already-paid');
+    btn.disabled = true;
+    btn.textContent = 'Checking payment...';
+
+    try {
+      const res  = await fetch(`https://${window.location.host}/api/mpesa/verify/${checkoutId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        clearTimers();
+        showSuccess(data.txn);
+      } else {
+        // Not confirmed yet — show message and re-enable button after 5s
+        const msgEl = document.getElementById('waiting-status-msg');
+        msgEl.classList.add('fade');
+        setTimeout(() => {
+          msgEl.textContent = data.message || 'Payment not confirmed yet. Please wait a moment.';
+          msgEl.dataset.current = msgEl.textContent;
+          msgEl.classList.remove('fade');
+        }, 400);
+
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '✓ Already Paid? Try Again';
+          verifying = false;
+        }, 5000);
+      }
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = '✓ Already Paid? Tap here';
+      verifying = false;
+    }
+  }
+
   function startPolling() {
     pollTimer = setInterval(async () => {
       try {
@@ -1066,9 +1136,11 @@
     cdTimer = setInterval(() => {
       countdown--;
       updateCountdown();
+      updateStatusMessage();
+      updateAlreadyPaidBtn();
       if (countdown <= 0) {
         clearTimers();
-        showFailed('Payment timed out. Please try again.');
+        showFailed('Payment timed out. If you already paid, please contact the host with your M-Pesa receipt.');
       }
     }, 1000);
   }
@@ -1080,11 +1152,11 @@
     if (text) text.textContent = `${countdown}s remaining`;
   }
 
-  // ── Voucher Redemption ──
+  // ── Voucher Redemption ────────────────────────────────────────
   function checkVoucherInput() {
     const code = document.getElementById('voucher-code').value;
     const btn  = document.getElementById('btn-redeem');
-    btn.disabled = true;  // always disable until lookup succeeds
+    btn.disabled = true;
     document.getElementById('voucher-info').style.display = 'none';
     hideError('voucher');
     voucherData = null;
@@ -1100,7 +1172,7 @@
         document.getElementById('v-pkg').textContent    = data.voucher.package_name;
         document.getElementById('v-dur').textContent    = fmtDur(data.voucher.duration_minutes);
         document.getElementById('voucher-info').style.display = 'block';
-        document.getElementById('btn-redeem').disabled = false;  // enable on valid lookup
+        document.getElementById('btn-redeem').disabled = false;
         hideError('voucher');
       } else {
         voucherData = null;
@@ -1133,23 +1205,23 @@
     }
   }
 
-  // ── Screen management ──
+  // ── Screen management ─────────────────────────────────────────
   function showScreen(name) {
-    const card = document.getElementById('main-card');
-    // Hide tabs + panels when showing status screens
-    const tabsEl  = card.querySelector('.tabs');
+    const card     = document.getElementById('main-card');
+    const tabsEl   = card.querySelector('.tabs');
     const panelsEl = card.querySelectorAll('.panel');
     const screens  = card.querySelectorAll('.status-screen');
 
     screens.forEach(s => s.classList.remove('show'));
 
     if (name === 'form') {
-      tabsEl.style.display  = '';
+      tabsEl.style.display = '';
       panelsEl.forEach(p => {
         if (p.id === `panel-${currentTab}`) p.classList.add('active');
       });
+      verifying = false;
     } else {
-      tabsEl.style.display  = 'none';
+      tabsEl.style.display = 'none';
       panelsEl.forEach(p => p.classList.remove('active'));
       document.getElementById(`screen-${name}`)?.classList.add('show');
     }
@@ -1181,7 +1253,7 @@
     hideError('mpesa');
   }
 
-  // ── Tab switching ──
+  // ── Tab switching ─────────────────────────────────────────────
   let currentTab = 'mpesa';
   function switchTab(tab) {
     currentTab = tab;
@@ -1191,7 +1263,7 @@
     document.getElementById(`panel-${tab}`).classList.add('active');
   }
 
-  // ── Helpers ──
+  // ── Helpers ───────────────────────────────────────────────────
   function fmtDur(mins) {
     if (!mins) return '—';
     if (mins >= 10080) return `${mins/10080} Week${mins>=20160?'s':''}`;
@@ -1213,9 +1285,9 @@
   function clearTimers() {
     clearInterval(pollTimer);
     clearInterval(cdTimer);
+    clearInterval(msgTimer);
   }
 
-  // Parse all params Omada injects into the redirect URL
   function getOmadaParams() {
     const p = new URLSearchParams(window.location.search);
     return {
