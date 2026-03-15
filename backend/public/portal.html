@@ -616,6 +616,101 @@
     animation: spin 0.8s linear infinite;
   }
 
+  /* ── Having Trouble panel ── */
+  .trouble-wrap {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 12px;
+    animation: fadeUp 0.5s ease 0.3s both;
+  }
+
+  .trouble-toggle {
+    width: 100%;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-family: var(--font-m);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .trouble-toggle:hover { border-color: var(--border2); color: var(--text); }
+
+  .trouble-body {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 16px;
+  }
+
+  .trouble-body.open { display: flex; }
+
+  .trouble-toggle.open {
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-color: var(--border2);
+    color: var(--text);
+  }
+
+  .trouble-desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  .trouble-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-m);
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .trouble-textarea:focus { border-color: var(--accent); }
+  .trouble-textarea::placeholder { color: var(--text3); }
+
+  .trouble-error {
+    font-size: 12px;
+    color: var(--red);
+    display: none;
+    line-height: 1.5;
+  }
+  .trouble-error.show { display: block; }
+
+  .btn-claim {
+    background: var(--surface2);
+    border: 1.5px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-d);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-claim:hover { border-color: var(--accent); background: rgba(240,165,0,0.05); }
+  .btn-claim:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .footer {
     margin-top: 24px;
     font-family: var(--font-m);
@@ -797,6 +892,30 @@
     </div>
 
   </div><!-- /card -->
+
+  <!-- ── HAVING TROUBLE? PANEL ── -->
+  <div class="trouble-wrap" id="trouble-wrap">
+    <button class="trouble-toggle" id="trouble-toggle" onclick="toggleTrouble()">
+      ⚠ Having trouble? Already paid but not connected?
+    </button>
+    <div class="trouble-body" id="trouble-body">
+      <div class="trouble-desc">
+        Paste your full M-Pesa confirmation SMS below. The system will verify your payment and activate your session automatically.
+        <br/><br/>
+        <strong>Only works for payments made via this portal.</strong>
+      </div>
+      <textarea
+        class="trouble-textarea"
+        id="claim-message"
+        placeholder="e.g. UCE0P98BVV Confirmed. Ksh10.00 paid to MONARCH WIRELESS 632868 on 14/3/26 at 10:17 AM..."
+        oninput="claimMsgChanged()"
+      ></textarea>
+      <div class="trouble-error" id="claim-error"></div>
+      <button class="btn-claim" id="btn-claim" disabled onclick="claimSession()">
+        Verify &amp; Activate Session
+      </button>
+    </div>
+  </div>
 
   <div class="footer">SECURED CONNECTION · MONARCH WIRELESS © 2026</div>
 
@@ -1302,6 +1421,62 @@
 
   function getClientMac() {
     return getOmadaParams().mac;
+  }
+
+  // ── Having Trouble panel ──────────────────────────────────────
+  function toggleTrouble() {
+    const body    = document.getElementById('trouble-body');
+    const toggle  = document.getElementById('trouble-toggle');
+    const isOpen  = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    toggle.classList.toggle('open', !isOpen);
+  }
+
+  function claimMsgChanged() {
+    const msg = document.getElementById('claim-message').value.trim();
+    document.getElementById('btn-claim').disabled = msg.length < 20;
+    document.getElementById('claim-error').classList.remove('show');
+  }
+
+  async function claimSession() {
+    const message = document.getElementById('claim-message').value.trim();
+    const btn     = document.getElementById('btn-claim');
+    const errEl   = document.getElementById('claim-error');
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+    errEl.classList.remove('show');
+
+    try {
+      const res  = await fetch(`https://${window.location.host}/api/mpesa/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, ...getOmadaParams() }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.status === 'success') {
+        // Success — show success screen
+        clearTimers();
+        document.getElementById('receipt-badge').textContent =
+          data.txn?.mpesa_receipt ? `Receipt: ${data.txn.mpesa_receipt}` : 'Payment Verified ✓';
+        document.getElementById('s-pkg').textContent  = data.txn?.package_name || '—';
+        document.getElementById('s-dur').textContent  = fmtDur(data.txn?.duration_minutes);
+        document.getElementById('s-expires').textContent =
+          data.txn?.end_at ? new Date(data.txn.end_at).toLocaleTimeString() : '—';
+        showScreen('success');
+      } else {
+        errEl.textContent = data.error || 'Verification failed. Please try again.';
+        errEl.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Verify & Activate Session';
+      }
+    } catch {
+      errEl.textContent = 'Network error. Please check your connection and try again.';
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Verify & Activate Session';
+    }
   }
 </script>
 </body>

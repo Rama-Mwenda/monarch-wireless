@@ -5,6 +5,7 @@ const kopokopo  = require('../services/kopokopo');
 const sms       = require('../services/sms');
 const macAuth   = require('../helpers/mac-auth-helper');
 const punchcard = require('../helpers/punchcard');
+const { parseMpesaMessage } = require('../helpers/mpesa-parser');
 
 // ── Get active payment provider ───────────────────────────────
 function getActiveProvider() {
@@ -110,10 +111,19 @@ router.post('/stk-push', async (req, res) => {
     }
 
   } catch (err) {
-    console.error('STK Push error:', err.response?.data || err.message);
+    const errData = err.response?.data || {};
+    console.error('STK Push error:', errData || err.message);
+
+    // KopoKopo 429 — pending STK push already active for this number
+    if (errData.error_code === 429) {
+      return res.status(429).json({
+        error: 'A payment prompt is already pending on your phone. Please check your M-Pesa messages and complete or cancel it first, then try again.',
+      });
+    }
+
     res.status(502).json({
       error:  'Payment request failed',
-      detail: err.response?.data || err.message,
+      detail: errData || err.message,
     });
   }
 });
@@ -513,7 +523,186 @@ router.post('/k2-callback', async (req, res) => {
   }
 });
 
-// ── GET /api/mpesa/transactions ──────────────────────────────
+// ── POST /api/mpesa/claim ─────────────────────────────────────
+// Manual claim — customer pastes full M-Pesa message to recover
+// a paid session when the automatic callback was delayed or missed.
+// Only works for payments initiated via the portal STK push.
+router.post('/claim', async (req, res) => {
+  const { message, mac, ap_mac, ssid_name, radio_id } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Please paste your full M-Pesa confirmation message.' });
+  }
+
+  // ── Parse the M-Pesa message ──────────────────────────────────
+  const parsed = parseMpesaMessage(message);
+  if (!parsed) {
+    return res.status(400).json({
+      error: 'Could not read that message. Please paste the full M-Pesa confirmation SMS exactly as received.',
+    });
+  }
+
+  const { transactionId, amount, tillNumber, parsedDate } = parsed;
+
+  // ── Validate till number against active provider config ───────
+  const provider = getActiveProvider();
+  let configuredTill = null;
+
+  try {
+    if (provider === 'kopokopo') {
+      const cfg = kopokopo.getCfg();
+      configuredTill = cfg.tillNumber;
+    } else {
+      // M-Pesa Daraja — get shortcode from payment_config
+      const row = db.prepare("SELECT value FROM payment_config WHERE key = 'mpesa_shortcode'").get();
+      configuredTill = row?.value;
+    }
+  } catch { /* fall through */ }
+
+  if (configuredTill && tillNumber && String(tillNumber) !== String(configuredTill)) {
+    return res.status(400).json({
+      error: `This payment was made to till ${tillNumber}, not to Monarch Wireless. Please ensure you paid the correct till number.`,
+    });
+  }
+
+  // ── Validate datetime — must be within last 24 hours ──────────
+  if (parsedDate) {
+    const ageHours = (Date.now() - parsedDate.getTime()) / (1000 * 60 * 60);
+    if (ageHours > 24) {
+      return res.status(400).json({
+        error: 'This M-Pesa message is more than 24 hours old and cannot be used to claim access.',
+      });
+    }
+  }
+
+  // ── Check transaction ID exists in our DB ─────────────────────
+  const txn = db.prepare(`
+    SELECT t.*, p.name as package_name, p.duration_minutes,
+           p.loyalty_points, p.price as pkg_price
+    FROM mpesa_transactions t
+    LEFT JOIN packages p ON t.package_id = p.id
+    WHERE t.mpesa_receipt = ? OR t.checkout_request_id = ?
+  `).get(transactionId, transactionId);
+
+  if (!txn) {
+    return res.status(404).json({
+      error: 'This payment was not initiated via the Monarch Wireless portal. Only payments made through the portal can be claimed here.',
+    });
+  }
+
+  // ── Check amount matches ──────────────────────────────────────
+  if (amount && txn.amount && Math.abs(amount - txn.amount) > 0.5) {
+    return res.status(400).json({
+      error: `Payment amount KES ${amount} does not match the expected amount for this transaction.`,
+    });
+  }
+
+  // ── Check not already claimed ─────────────────────────────────
+  const existingSession = db.prepare(
+    "SELECT id FROM sessions WHERE mpesa_ref = ?"
+  ).get(transactionId);
+
+  if (existingSession) {
+    return res.status(409).json({
+      error: 'This payment has already been used to activate a session. If you believe this is an error, please contact the host.',
+    });
+  }
+
+  // ── Transaction must be success status ────────────────────────
+  if (txn.status !== 'success') {
+    return res.status(400).json({
+      error: `This payment has status "${txn.status}". Only successful payments can be claimed.`,
+    });
+  }
+
+  // ── All checks passed — create session ───────────────────────
+  try {
+    const pkg = db.prepare('SELECT * FROM packages WHERE id = ?').get(txn.package_id);
+    if (!pkg) return res.status(500).json({ error: 'Package not found for this transaction.' });
+
+    let user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
+    if (!user) {
+      db.prepare('INSERT INTO users (phone) VALUES (?)').run(txn.phone);
+      user = db.prepare('SELECT * FROM users WHERE phone = ?').get(txn.phone);
+    }
+
+    const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
+    const receipt = transactionId;
+
+    const sessionResult = db.prepare(`
+      INSERT INTO sessions
+        (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref,
+         loyalty_points_earned, end_at, client_mac, ap_mac, ssid_name, radio_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user.id, txn.site_id, pkg.id,
+      txn.provider || 'kopokopo',
+      txn.amount, receipt,
+      pkg.loyalty_points || 0, endAt,
+      mac || txn.client_mac || null,
+      ap_mac || txn.ap_mac || null,
+      ssid_name || txn.ssid_name || null,
+      radio_id || txn.radio_id || null
+    );
+
+    // Update user stats
+    const newSpent    = (user.total_spent    || 0) + txn.amount;
+    const newSessions = (user.total_sessions || 0) + 1;
+    const newPoints   = (user.loyalty_points || 0) + (pkg.loyalty_points || 0);
+    const newPunch    = (user.punch_count    || 0) + 1;
+
+    db.prepare(`
+      UPDATE users SET total_spent=?, total_sessions=?, loyalty_points=?,
+        punch_count=?, tier=?, last_seen=datetime('now') WHERE id=?
+    `).run(newSpent, newSessions, newPoints, newPunch, calcTier(newSpent), user.id);
+
+    // Authorize MAC with Omada (non-blocking)
+    const clientMac = mac || txn.client_mac;
+    if (clientMac) {
+      macAuth.authorizeSession({
+        sessionId:       sessionResult.lastInsertRowid,
+        userId:          user.id,
+        packageId:       pkg.id,
+        clientMac,
+        apMac:           ap_mac || txn.ap_mac,
+        ssidName:        ssid_name || txn.ssid_name,
+        radioId:         radio_id || txn.radio_id,
+        site:            process.env.OMADA_SITE_NAME,
+        durationMinutes: pkg.duration_minutes,
+      }).catch(e => console.error('MAC auth error (claim):', e.message));
+    }
+
+    // Punchcard + SMS (non-blocking)
+    if (txn.phone && !txn.phone.startsWith('mac:')) {
+      punchcard.checkPunchcard(user.id, txn.phone).catch(console.error);
+      sms.sessionStarted({
+        phone:       txn.phone,
+        packageName: pkg.name,
+        duration:    sms.fmtDuration(pkg.duration_minutes),
+        expiresAt:   endAt,
+        receipt,
+      }).catch(console.error);
+    }
+
+    console.log(`✅ Manual claim success: ${receipt} KES ${txn.amount} — ${pkg.name}`);
+
+    return res.json({
+      status:  'success',
+      txn: {
+        mpesa_receipt:    receipt,
+        end_at:           endAt,
+        package_name:     pkg.name,
+        duration_minutes: pkg.duration_minutes,
+      },
+    });
+
+  } catch (err) {
+    console.error('Claim error:', err.message);
+    return res.status(500).json({ error: 'Failed to activate session. Please contact the host.' });
+  }
+});
+
+
 router.get('/transactions', async (req, res) => {
   const txns = db.prepare(`
     SELECT t.*, p.name as package_name
