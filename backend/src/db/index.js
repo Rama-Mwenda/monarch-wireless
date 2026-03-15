@@ -44,6 +44,7 @@ safeAlter('ALTER TABLE mpesa_transactions ADD COLUMN provider TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN reset_token TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN reset_token_expires TEXT');
 safeAlter('ALTER TABLE admins ADD COLUMN phone TEXT');
+safeAlter('ALTER TABLE admins ADD COLUMN updated_at TEXT');
 
 // Ensure expenses table exists
 db.exec(`
