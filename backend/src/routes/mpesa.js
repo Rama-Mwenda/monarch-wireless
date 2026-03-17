@@ -16,14 +16,23 @@ function getActiveProvider() {
 }
 
 // ── Extract clean M-Pesa receipt from KopoKopo response ───────
-// KopoKopo sometimes returns a full URL as the receipt/reference.
-// This strips it down to just the M-Pesa transaction code (e.g. UCHOP9JROS).
+// KopoKopo sometimes returns a full URL or UUID as the receipt/reference.
+// This strips it down to just the M-Pesa transaction code (e.g. UCI0P9MIGX).
 function extractReceipt(raw) {
   if (!raw) return raw;
   const str = String(raw);
-  // If it looks like a URL, take the last path segment
   if (str.startsWith('http')) return str.split('/').pop();
   return str;
+}
+
+// Returns true if the string looks like a KopoKopo UUID rather than an M-Pesa reference
+function isUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || '');
+}
+
+// Returns true if the string looks like a real M-Pesa reference (e.g. UCI0P9MIGX)
+function isMpesaRef(str) {
+  return /^[A-Z0-9]{8,12}$/.test(str || '');
 }
 
 const router = express.Router();
@@ -222,6 +231,7 @@ router.post('/verify/:checkoutId', async (req, res) => {
       // Payment confirmed — extract clean receipt
       // FIX: use mpesa_reference first (actual M-Pesa code), fallback and strip URLs
       const rawReceipt = k2Status.mpesa_reference
+        || k2Status.attributes?.event?.resource?.reference
         || k2Status.event?.resource?.mpesa_reference
         || k2Status.event?.resource?.reference
         || k2Status.reference
@@ -490,7 +500,16 @@ router.post('/k2-callback', async (req, res) => {
 
     // Guard against double processing
     if (txn.status === 'success') {
-      console.log(`K2 callback — already processed: ${paymentId}`);
+      // If verify ran before callback, receipt may be stored as UUID — update it with real M-Pesa ref
+      if (isUUID(txn.mpesa_receipt) && isMpesaRef(receipt)) {
+        db.prepare(`UPDATE mpesa_transactions SET mpesa_receipt = ? WHERE checkout_request_id = ?`)
+          .run(receipt, paymentId);
+        db.prepare(`UPDATE sessions SET mpesa_ref = ? WHERE mpesa_ref = ?`)
+          .run(receipt, txn.mpesa_receipt);
+        console.log(`K2 callback — updated receipt UUID → ${receipt}`);
+      } else {
+        console.log(`K2 callback — already processed: ${paymentId}`);
+      }
       return;
     }
 
