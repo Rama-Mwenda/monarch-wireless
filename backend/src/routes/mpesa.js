@@ -272,6 +272,9 @@ router.post('/verify/:checkoutId', async (req, res) => {
         txn.client_mac || null, txn.ap_mac || null,
         txn.ssid_name  || null, txn.radio_id || null
       );
+      // FIX: sessions use UUID not integer rowid
+      const sessionUUID = db.prepare('SELECT id FROM sessions WHERE rowid = ?')
+        .get(sessionResult.lastInsertRowid)?.id;
 
       // Update user stats
       const newSpent    = (user.total_spent    || 0) + amount;
@@ -289,7 +292,7 @@ router.post('/verify/:checkoutId', async (req, res) => {
       // Authorize MAC with Omada (non-blocking)
       if (txn.client_mac) {
         macAuth.authorizeSession({
-          sessionId:       sessionResult.lastInsertRowid,
+          sessionId:       sessionUUID,
           userId:          user.id,
           packageId:       pkg.id,
           clientMac:       txn.client_mac,
@@ -400,6 +403,9 @@ router.post('/callback', async (req, res) => {
         txn.client_mac || null, txn.ap_mac  || null,
         txn.ssid_name  || null, txn.radio_id || null
       );
+      // FIX: sessions use UUID not integer rowid
+      const sessionUUID = db.prepare('SELECT id FROM sessions WHERE rowid = ?')
+        .get(sessionResult.lastInsertRowid)?.id;
 
       const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
       const newSessions = (user.total_sessions || 0) + 1;
@@ -413,10 +419,10 @@ router.post('/callback', async (req, res) => {
 
       console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
 
-      // FIX: use sessionResult.lastInsertRowid not txn.id
+      // FIX: use sessionUUID not lastInsertRowid
       if (txn.client_mac) {
         macAuth.authorizeSession({
-          sessionId:       sessionResult.lastInsertRowid,
+          sessionId:       sessionUUID,
           userId:          user.id,
           packageId:       pkg.id,
           clientMac:       txn.client_mac,
@@ -526,6 +532,9 @@ router.post('/k2-callback', async (req, res) => {
       txn.client_mac || null, txn.ap_mac  || null,
       txn.ssid_name  || null, txn.radio_id || null
     );
+    // FIX: sessions use UUID not integer rowid
+    const sessionUUID = db.prepare('SELECT id FROM sessions WHERE rowid = ?')
+      .get(sessionResult.lastInsertRowid)?.id;
 
     const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
     const newSessions = (user.total_sessions || 0) + 1;
@@ -539,7 +548,7 @@ router.post('/k2-callback', async (req, res) => {
 
     if (txn.client_mac) {
       macAuth.authorizeSession({
-        sessionId:       sessionResult.lastInsertRowid,
+        sessionId:       sessionUUID,
         userId:          user.id,
         packageId:       pkg.id,
         clientMac:       txn.client_mac,
@@ -687,6 +696,9 @@ router.post('/claim', async (req, res) => {
       ssid_name || txn.ssid_name || null,
       radio_id || txn.radio_id || null
     );
+    // FIX: sessions use UUID not integer rowid
+    const sessionUUID = db.prepare('SELECT id FROM sessions WHERE rowid = ?')
+      .get(sessionResult.lastInsertRowid)?.id;
 
     // Update user stats
     const newSpent    = (user.total_spent    || 0) + txn.amount;
@@ -703,7 +715,7 @@ router.post('/claim', async (req, res) => {
     const clientMac = mac || txn.client_mac;
     if (clientMac) {
       macAuth.authorizeSession({
-        sessionId:       sessionResult.lastInsertRowid,
+        sessionId:       sessionUUID,
         userId:          user.id,
         packageId:       pkg.id,
         clientMac,
