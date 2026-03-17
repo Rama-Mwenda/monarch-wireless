@@ -32,14 +32,17 @@ async function authorizeSession({
 
   const deviceLimit = pkg.device_limit || 1;
 
-  // ── Device limit check (Monarch-side) ───────────────────────
+  // ── Device limit check (per MAC, not per user) ──────────────────
+  // Counts active sessions for this specific device only.
+  // This allows a user to pay for multiple devices using the same phone number.
   if (deviceLimit > 0 && clientMac) {
+    const normMac = omada.normaliseMac(clientMac);
     const activeSessions = db.prepare(`
       SELECT COUNT(*) as cnt FROM sessions
-      WHERE user_id = ? AND status = 'active'
+      WHERE client_mac = ? AND status = 'active'
       AND end_at > datetime('now')
       AND id != ?
-    `).get(userId, sessionId);
+    `).get(normMac, sessionId);
 
     if (activeSessions.cnt >= deviceLimit) {
       // Mark this session as terminated immediately

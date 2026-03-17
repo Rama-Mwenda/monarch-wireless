@@ -860,7 +860,7 @@
         <div class="session-row"><span>Duration</span><span id="s-dur">—</span></div>
         <div class="session-row"><span>Expires</span><span id="s-expires">—</span></div>
       </div>
-      <button class="btn-done" onclick="window.location.href=getOmadaParams().redirectUrl">
+      <button class="btn-done" id="btn-browse" onclick="startBrowsing()">
         Start Browsing →
       </button>
     </div>
@@ -1430,6 +1430,18 @@
     const isOpen  = body.classList.contains('open');
     body.classList.toggle('open', !isOpen);
     toggle.classList.toggle('open', !isOpen);
+  }
+
+  // ── Start Browsing — delay redirect to let Omada auth propagate ─
+  function startBrowsing() {
+    const btn = document.getElementById('btn-browse');
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+    setTimeout(() => {
+      const url = getOmadaParams().redirectUrl
+        || 'http://connectivitycheck.gstatic.com/generate_204';
+      window.location.href = url;
+    }, 3000);
   }
 
   function claimMsgChanged() {
