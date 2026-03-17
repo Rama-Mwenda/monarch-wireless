@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MessageSquare, Settings, Send, ToggleLeft, ToggleRight,
          Eye, EyeOff, CheckCircle, AlertCircle, ChevronDown,
          ChevronUp, Megaphone, Clock } from 'lucide-react';
@@ -213,7 +213,7 @@ export default function Sms() {
   const [broadcast,  setBroadcast] = useState({ message: '', tier: '' });
   const [sending,    setSending]   = useState(false);
 
-  const loadAll = useCallback(async () => {
+  async function loadAll() {
     try {
       const [p, t, l] = await Promise.all([
         api.get('/sms/providers'),
@@ -224,9 +224,9 @@ export default function Sms() {
       setTemplates(t.data.templates || []);
       setLogs(l.data.logs || []);
     } catch { /* silent */ }
-  }, []);
+  }
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadAll(); }, []); // eslint-disable-line react-hooks/set-state-in-effect
 
   async function saveProvider(id, data) {
     try {
@@ -287,13 +287,16 @@ export default function Sms() {
           { key: 'providers', label: 'Providers',  icon: Settings },
           { key: 'broadcast', label: 'Broadcast',  icon: Megaphone },
           { key: 'log',       label: 'SMS Log',    icon: Clock },
-        ].map(({ key, label, icon: Icon }) => (
-          <button key={key}
-            className={`${styles.tab} ${tab === key ? styles.tabActive : ''}`}
-            onClick={() => setTab(key)}>
-            <Icon size={14}/> {label}
-          </button>
-        ))}
+        ].map(({ key, label, icon }) => {
+          const TabIcon = icon;
+          return (
+            <button key={key}
+              className={`${styles.tab} ${tab === key ? styles.tabActive : ''}`}
+              onClick={() => setTab(key)}>
+              <TabIcon size={14}/> {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── TEMPLATES TAB ── */}

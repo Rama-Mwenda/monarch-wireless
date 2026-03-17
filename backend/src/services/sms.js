@@ -101,7 +101,12 @@ const COMPANY    = 'Monarch Wireless';
 function sessionStarted({ userId, phone, packageName, duration, expiresAt, receipt }) {
   const tmpl = getTemplate('session_started');
   const expiry = expiresAt
-    ? new Date(expiresAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(expiresAt).toLocaleTimeString('en-KE', {
+        hour:     '2-digit',
+        minute:   '2-digit',
+        hour12:   true,
+        timeZone: 'Africa/Nairobi',
+      })
     : '';
   const message = tmpl
     ? fillTemplate(tmpl.content, { company: COMPANY, package: packageName, duration, expiry, receipt, portal_url: PORTAL_URL })
@@ -128,7 +133,12 @@ function sessionExpired({ userId, phone, packageName }) {
 function voucherRedeemed({ userId, phone, packageName, duration, expiresAt }) {
   const tmpl = getTemplate('voucher_redeemed');
   const expiry = expiresAt
-    ? new Date(expiresAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(expiresAt).toLocaleTimeString('en-KE', {
+        hour:     '2-digit',
+        minute:   '2-digit',
+        hour12:   true,
+        timeZone: 'Africa/Nairobi',
+      })
     : '';
   const message = tmpl
     ? fillTemplate(tmpl.content, { company: COMPANY, package: packageName, duration, expiry, portal_url: PORTAL_URL })
