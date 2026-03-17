@@ -15,6 +15,17 @@ function getActiveProvider() {
   } catch { return 'mpesa'; }
 }
 
+// ── Extract clean M-Pesa receipt from KopoKopo response ───────
+// KopoKopo sometimes returns a full URL as the receipt/reference.
+// This strips it down to just the M-Pesa transaction code (e.g. UCHOP9JROS).
+function extractReceipt(raw) {
+  if (!raw) return raw;
+  const str = String(raw);
+  // If it looks like a URL, take the last path segment
+  if (str.startsWith('http')) return str.split('/').pop();
+  return str;
+}
+
 const router = express.Router();
 
 // ── POST /api/mpesa/stk-push ─────────────────────────────────
@@ -208,8 +219,15 @@ router.post('/verify/:checkoutId', async (req, res) => {
         });
       }
 
-      // Payment confirmed — process it
-      const receipt = k2Status.reference || k2Status.receipt || checkoutId;
+      // Payment confirmed — extract clean receipt
+      // FIX: use mpesa_reference first (actual M-Pesa code), fallback and strip URLs
+      const rawReceipt = k2Status.mpesa_reference
+        || k2Status.event?.resource?.mpesa_reference
+        || k2Status.event?.resource?.reference
+        || k2Status.reference
+        || k2Status.receipt
+        || checkoutId;
+      const receipt = extractReceipt(rawReceipt);
       const amount  = parseFloat(k2Status.amount || txn.amount);
 
       // Guard against double processing
@@ -252,7 +270,7 @@ router.post('/verify/:checkoutId', async (req, res) => {
         user.id, txn.site_id, pkg.id,
         amount, receipt, pkg.loyalty_points || 0, endAt,
         txn.client_mac || null, txn.ap_mac || null,
-        txn.ssid_name || null, txn.radio_id || null
+        txn.ssid_name  || null, txn.radio_id || null
       );
 
       // Update user stats
@@ -368,11 +386,20 @@ router.post('/callback', async (req, res) => {
       }
 
       const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
-      db.prepare(`
+
+      // FIX: include client_mac, ap_mac, ssid_name, radio_id in session INSERT
+      const sessionResult = db.prepare(`
         INSERT INTO sessions
-          (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref, loyalty_points_earned, end_at)
-        VALUES (?, ?, ?, 'mpesa', ?, ?, ?, ?)
-      `).run(user.id, txn.site_id, pkg.id, amount || txn.amount, mpesaReceipt, pkg.loyalty_points || 0, endAt);
+          (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref,
+           loyalty_points_earned, end_at, client_mac, ap_mac, ssid_name, radio_id)
+        VALUES (?, ?, ?, 'mpesa', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        user.id, txn.site_id, pkg.id,
+        amount || txn.amount, mpesaReceipt,
+        pkg.loyalty_points || 0, endAt,
+        txn.client_mac || null, txn.ap_mac  || null,
+        txn.ssid_name  || null, txn.radio_id || null
+      );
 
       const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
       const newSessions = (user.total_sessions || 0) + 1;
@@ -386,9 +413,10 @@ router.post('/callback', async (req, res) => {
 
       console.log(`Session created for ${txn.phone} — ${pkg.name} until ${endAt}`);
 
+      // FIX: use sessionResult.lastInsertRowid not txn.id
       if (txn.client_mac) {
         macAuth.authorizeSession({
-          sessionId:       txn.id,
+          sessionId:       sessionResult.lastInsertRowid,
           userId:          user.id,
           packageId:       pkg.id,
           clientMac:       txn.client_mac,
@@ -432,7 +460,13 @@ router.post('/k2-callback', async (req, res) => {
     const paymentId = data.id || req.body?.data?.id;
     const amount    = parseFloat(data.amount || data.event?.resource?.amount || 0);
     const phone     = data.event?.resource?.sender_phone_number || data.sender_msisdn || '';
-    const receipt   = data.event?.resource?.reference || data.reference || paymentId;
+
+    // FIX: prefer mpesa_reference (actual M-Pesa code), strip URLs from fallbacks
+    const rawReceipt = data.event?.resource?.mpesa_reference
+      || data.event?.resource?.reference
+      || data.reference
+      || paymentId;
+    const receipt = extractReceipt(rawReceipt);
 
     if (status !== 'Received' && status !== 'Success') {
       console.log(`K2 callback ignored — status: ${status}`);
@@ -478,11 +512,20 @@ router.post('/k2-callback', async (req, res) => {
     }
 
     const endAt = new Date(Date.now() + pkg.duration_minutes * 60 * 1000).toISOString();
+
+    // FIX: include client_mac, ap_mac, ssid_name, radio_id in session INSERT
     const sessionResult = db.prepare(`
       INSERT INTO sessions
-        (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref, loyalty_points_earned, end_at)
-      VALUES (?, ?, ?, 'kopokopo', ?, ?, ?, ?)
-    `).run(user.id, txn.site_id, pkg.id, amount || txn.amount, receipt, pkg.loyalty_points || 0, endAt);
+        (user_id, site_id, package_id, payment_method, amount_paid, mpesa_ref,
+         loyalty_points_earned, end_at, client_mac, ap_mac, ssid_name, radio_id)
+      VALUES (?, ?, ?, 'kopokopo', ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user.id, txn.site_id, pkg.id,
+      amount || txn.amount, receipt,
+      pkg.loyalty_points || 0, endAt,
+      txn.client_mac || null, txn.ap_mac  || null,
+      txn.ssid_name  || null, txn.radio_id || null
+    );
 
     const newSpent    = (user.total_spent    || 0) + (amount || txn.amount);
     const newSessions = (user.total_sessions || 0) + 1;
