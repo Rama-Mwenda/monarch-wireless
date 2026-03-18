@@ -21,7 +21,7 @@ async function runExpiryCheck() {
       JOIN users u    ON s.user_id    = u.id
       JOIN packages p ON s.package_id = p.id
       WHERE s.status = 'active'
-        AND s.end_at <= datetime('now')
+        AND datetime(s.end_at) <= datetime('now')
     `).all();
 
     if (!expired.length) return;
@@ -72,8 +72,8 @@ async function runExpiringSoonCheck() {
       JOIN users u    ON s.user_id    = u.id
       JOIN packages p ON s.package_id = p.id
       WHERE s.status = 'active'
-        AND s.end_at  > datetime('now')
-        AND s.end_at <= datetime('now', '+10 minutes')
+        AND datetime(s.end_at)  > datetime('now')
+        AND datetime(s.end_at) <= datetime('now', '+10 minutes')
         AND s.warned_expiry = 0
     `).all();
 
