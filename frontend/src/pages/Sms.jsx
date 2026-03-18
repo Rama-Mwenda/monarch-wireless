@@ -413,7 +413,13 @@ export default function Sms() {
                         {l.status}
                       </span>
                     </td>
-                    <td className={styles.mono}>{l.created_at?.slice(0, 16)}</td>
+                    <td className={styles.mono}>
+                      {l.created_at ? new Date(l.created_at + 'Z').toLocaleString('en-KE', {
+                        timeZone: 'Africa/Nairobi',
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: false,
+                      }) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
