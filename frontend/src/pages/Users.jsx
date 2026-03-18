@@ -33,10 +33,31 @@ export default function Users() {
   const [addPoints, setAddPoints] = useState(5);
   const [actionMsg, setActionMsg] = useState('');
   const [punchTarget, setPunchTarget] = useState(6);
+  const [punchTargetInput, setPunchTargetInput] = useState(6);
+  const [punchTargetSaving, setPunchTargetSaving] = useState(false);
+  const [punchTargetMsg, setPunchTargetMsg] = useState('');
 
   useEffect(() => {
-    api.get('/settings').then(r => setPunchTarget(r.data.punch_target || 6)).catch(() => {});
+    api.get('/settings').then(r => {
+      const t = r.data.punch_target || 6;
+      setPunchTarget(t);
+      setPunchTargetInput(t);
+    }).catch(() => {});
   }, []);
+
+  async function savePunchTarget() {
+    setPunchTargetSaving(true);
+    setPunchTargetMsg('');
+    try {
+      await api.put('/settings', { punch_target: punchTargetInput });
+      setPunchTarget(punchTargetInput);
+      setPunchTargetMsg('✓ Saved');
+      setTimeout(() => setPunchTargetMsg(''), 2000);
+    } catch {
+      setPunchTargetMsg('✗ Failed to save');
+    }
+    setPunchTargetSaving(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -130,6 +151,48 @@ export default function Users() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Punch card target setting */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 16px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        marginBottom: 12,
+        width: 'fit-content',
+      }}>
+        <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--font-mono, monospace)', letterSpacing: 1 }}>
+          🎯 PUNCH TARGET
+        </span>
+        <input
+          type="number" min="1" max="100"
+          value={punchTargetInput}
+          onChange={e => setPunchTargetInput(parseInt(e.target.value) || 1)}
+          style={{
+            width: 52, padding: '4px 8px', borderRadius: 6,
+            background: 'var(--surface2)', border: '1px solid var(--border2)',
+            color: 'var(--text)', fontSize: 13, textAlign: 'center',
+          }}
+        />
+        <span style={{ fontSize: 12, color: 'var(--text3)' }}>sessions</span>
+        <button
+          onClick={savePunchTarget}
+          disabled={punchTargetSaving || punchTargetInput === punchTarget}
+          style={{
+            padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+            background: 'var(--accent)', color: '#000', border: 'none',
+            cursor: punchTargetSaving || punchTargetInput === punchTarget ? 'not-allowed' : 'pointer',
+            opacity: punchTargetSaving || punchTargetInput === punchTarget ? 0.5 : 1,
+          }}>
+          {punchTargetSaving ? 'Saving…' : 'Save'}
+        </button>
+        {punchTargetMsg && (
+          <span style={{ fontSize: 12, color: punchTargetMsg.startsWith('✓') ? 'var(--green)' : 'var(--red)' }}>
+            {punchTargetMsg}
+          </span>
+        )}
       </div>
 
       {/* Table */}
