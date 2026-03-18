@@ -116,22 +116,21 @@ function sessionStarted({ userId, phone, packageName, duration, expiresAt, recei
 
 function sessionExpiringSoon({ userId, phone, packageName, minutesLeft }) {
   const tmpl = getTemplate('session_expiring');
-  const message = tmpl
-    ? fillTemplate(tmpl.content, { company: COMPANY, package: packageName, minutes: minutesLeft, portal_url: PORTAL_URL })
-    : `⏰ ${COMPANY}\nYour ${packageName} expires in ${minutesLeft} mins. Renew at ${PORTAL_URL}`;
+  if (!tmpl) return Promise.resolve({ skipped: true }); // only send if template is active
+  const message = fillTemplate(tmpl.content, { company: COMPANY, package: packageName, minutes: minutesLeft, portal_url: PORTAL_URL });
   return sendAndLog({ userId, phone, messageType: 'session_expiring', message });
 }
 
 function sessionExpired({ userId, phone, packageName }) {
   const tmpl = getTemplate('session_expired');
-  const message = tmpl
-    ? fillTemplate(tmpl.content, { company: COMPANY, package: packageName, portal_url: PORTAL_URL })
-    : `📴 ${COMPANY}\nYour ${packageName} session has ended. Reconnect at ${PORTAL_URL}`;
+  if (!tmpl) return Promise.resolve({ skipped: true }); // only send if template is active
+  const message = fillTemplate(tmpl.content, { company: COMPANY, package: packageName, portal_url: PORTAL_URL });
   return sendAndLog({ userId, phone, messageType: 'session_expired', message });
 }
 
 function voucherRedeemed({ userId, phone, packageName, duration, expiresAt }) {
   const tmpl = getTemplate('voucher_redeemed');
+  if (!tmpl) return Promise.resolve({ skipped: true }); // only send if template is active
   const expiry = expiresAt
     ? new Date(expiresAt).toLocaleTimeString('en-KE', {
         hour:     '2-digit',
@@ -140,9 +139,7 @@ function voucherRedeemed({ userId, phone, packageName, duration, expiresAt }) {
         timeZone: 'Africa/Nairobi',
       })
     : '';
-  const message = tmpl
-    ? fillTemplate(tmpl.content, { company: COMPANY, package: packageName, duration, expiry, portal_url: PORTAL_URL })
-    : `🎫 ${COMPANY}\nVoucher redeemed! ${packageName} (${duration}). Expires: ${expiry}. Enjoy!`;
+  const message = fillTemplate(tmpl.content, { company: COMPANY, package: packageName, duration, expiry, portal_url: PORTAL_URL });
   return sendAndLog({ userId, phone, messageType: 'voucher_redeemed', message });
 }
 
