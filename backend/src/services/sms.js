@@ -156,9 +156,10 @@ function customMessage({ userId, phone, message }) {
 
 function normalisePhone(phone) {
   let p = String(phone).replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-  if (p.startsWith('+')) return p.slice(1);
-  if (p.startsWith('0')) return `254${p.slice(1)}`;
-  if (p.startsWith('7')) return `254${p}`;
+  if (p.startsWith('+'))   return p.slice(1);            // +254117... → 254117...
+  if (p.startsWith('254')) return p;                     // already correct
+  if (p.startsWith('0'))   return `254${p.slice(1)}`;   // 0117... → 254117...
+  if (p.startsWith('7') || p.startsWith('1')) return `254${p}`; // 7xx or 1xx bare
   return p;
 }
 

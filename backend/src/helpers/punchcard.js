@@ -29,7 +29,7 @@ function getMostPurchasedPackage(userId) {
   return db.prepare(`
     SELECT package_id, COUNT(*) as cnt
     FROM sessions
-    WHERE user_id = ? AND payment_method IN ('mpesa', 'voucher')
+    WHERE user_id = ? AND payment_method IN ('mpesa', 'kopokopo', 'voucher')
     GROUP BY package_id
     ORDER BY cnt DESC
     LIMIT 1
