@@ -13,7 +13,14 @@
 const db  = require('../db');
 const sms = require('../services/sms');
 
-const PUNCH_TARGET = parseInt(process.env.PUNCH_TARGET || '10');
+// ── Read punch target from DB (falls back to env, then 10) ──
+function getPunchTarget() {
+  try {
+    const row = db.prepare("SELECT value FROM payment_config WHERE key = 'punch_target'").get();
+    if (row?.value) return parseInt(row.value);
+  } catch(e) { /* table may not have this key yet */ }
+  return parseInt(process.env.PUNCH_TARGET || '10');
+}
 
 // ── Generate a unique voucher code ───────────────────────────
 function generateCode() {
@@ -29,7 +36,7 @@ function getMostPurchasedPackage(userId) {
   return db.prepare(`
     SELECT package_id, COUNT(*) as cnt
     FROM sessions
-    WHERE user_id = ? AND payment_method IN ('mpesa', 'kopokopo', 'voucher')
+    WHERE user_id = ? AND payment_method IN ('mpesa', 'voucher')
     GROUP BY package_id
     ORDER BY cnt DESC
     LIMIT 1
@@ -43,24 +50,25 @@ async function checkPunchcard(userId, phone) {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   if (!user) return;
 
-  const totalSessions = user.total_sessions;
+  const PUNCH_TARGET      = getPunchTarget();
+  const totalSessions     = user.total_sessions;
   const sessionsIntoCycle = totalSessions % PUNCH_TARGET;
-  const sessionsLeft = sessionsIntoCycle === 0
-    ? 0   // just hit milestone
+  const sessionsLeft      = sessionsIntoCycle === 0
+    ? 0
     : PUNCH_TARGET - sessionsIntoCycle;
 
   // ── Milestone reached ────────────────────────────────────
   if (sessionsIntoCycle === 0 && totalSessions > 0) {
-    await handleMilestone(user, phone);
+    await handleMilestone(user, phone, PUNCH_TARGET);
     return;
   }
 
   // ── Progress reminder ────────────────────────────────────
-  await sendProgressSms(user, phone, sessionsLeft);
+  await sendProgressSms(user, phone, sessionsLeft, PUNCH_TARGET);
 }
 
 // ── Handle milestone: generate voucher + send SMS ─────────
-async function handleMilestone(user, phone) {
+async function handleMilestone(user, phone, PUNCH_TARGET) {
   try {
     // Find most purchased package
     const topPkg = getMostPurchasedPackage(user.id);
@@ -82,6 +90,9 @@ async function handleMilestone(user, phone) {
       INSERT INTO vouchers (code, package_id, site_id, expires_at)
       VALUES (?, ?, (SELECT id FROM sites LIMIT 1), ?)
     `).run(code, pkg.id, expiresAt);
+
+    // FIX: Reset punch_count to 0 so dots reset on the frontend
+    db.prepare(`UPDATE users SET punch_count = 0 WHERE id = ?`).run(user.id);
 
     console.log(`🎉 Punchcard milestone! Free voucher ${code} generated for ${phone}`);
 
@@ -116,7 +127,7 @@ async function handleMilestone(user, phone) {
 }
 
 // ── Progress SMS ─────────────────────────────────────────────
-async function sendProgressSms(user, phone, sessionsLeft) {
+async function sendProgressSms(user, phone, sessionsLeft, PUNCH_TARGET) {
   try {
     const tmpl = db.prepare(
       "SELECT * FROM sms_templates WHERE name = 'punchcard_progress' AND is_active = 1"
@@ -147,4 +158,4 @@ function fillTemplate(content, vars) {
   return content.replace(/\[\[(\w+)\]\]/g, (_, key) => vars[key] ?? '');
 }
 
-module.exports = { checkPunchcard, PUNCH_TARGET };
+module.exports = { checkPunchcard, getPunchTarget };

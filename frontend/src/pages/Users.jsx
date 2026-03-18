@@ -32,6 +32,11 @@ export default function Users() {
   const [extendMinutes, setExtendMinutes] = useState(30);
   const [addPoints, setAddPoints] = useState(5);
   const [actionMsg, setActionMsg] = useState('');
+  const [punchTarget, setPunchTarget] = useState(6);
+
+  useEffect(() => {
+    api.get('/settings').then(r => setPunchTarget(r.data.punch_target || 6)).catch(() => {});
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -46,7 +51,7 @@ export default function Users() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, [tierFilter]);
+  useEffect(() => { load(); }, [tierFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSearch(e) {
     e.preventDefault();
@@ -165,8 +170,8 @@ export default function Users() {
                 </td>
                 <td>
                   <div className={styles.punchRow}>
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <div key={i} className={`${styles.punch} ${i < u.punch_count ? styles.punchFilled : ''}`} />
+                    {Array.from({ length: punchTarget }).map((_, i) => (
+                      <div key={i} className={`${styles.punch} ${i < (u.punch_count % punchTarget) ? styles.punchFilled : ''}`} />
                     ))}
                   </div>
                 </td>
@@ -210,10 +215,10 @@ export default function Users() {
 
                 {/* Punch card */}
                 <div className={styles.detailSection}>
-                  <div className={styles.detailSectionTitle}>Punch Card ({userDetail.punch_count}/10)</div>
+                  <div className={styles.detailSectionTitle}>Punch Card ({userDetail.punch_count % punchTarget}/{punchTarget})</div>
                   <div className={styles.punchRowLarge}>
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <div key={i} className={`${styles.punchLarge} ${i < userDetail.punch_count ? styles.punchFilled : ''}`} />
+                    {Array.from({ length: punchTarget }).map((_, i) => (
+                      <div key={i} className={`${styles.punchLarge} ${i < (userDetail.punch_count % punchTarget) ? styles.punchFilled : ''}`} />
                     ))}
                   </div>
                 </div>

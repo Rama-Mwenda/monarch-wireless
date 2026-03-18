@@ -94,6 +94,7 @@ app.use('/api/sms',       require('./routes/sms-settings'));
 app.use('/api/payment',    require('./routes/payment-settings'));
 app.use('/api/payment',    require('./routes/payment-providers'));
 app.use('/api/hosts',      require('./routes/hosts'));
+app.use('/api/settings',   require('./routes/settings'));
 app.use('/portal',        require('./routes/portal'));
 
 // ── Health check ─────────────────────────────────────────────
