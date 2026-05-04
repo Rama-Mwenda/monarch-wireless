@@ -68,6 +68,9 @@ async function authorizeSession({
       radioId,
       site,
       durationMinutes,
+      // Pass bandwidth caps from package config (null = unlimited)
+      downloadKbps: pkg.download_kbps || null,
+      uploadKbps:   pkg.upload_kbps   || null,
     });
 
     // Record auth result on session
@@ -128,7 +131,8 @@ async function reauthorizeRoamingSession({
   // Find an active, unexpired session for this device
   // NOTE: we do NOT filter by ap_mac — intentional, this is the roaming check
   const session = db.prepare(`
-    SELECT s.*, p.duration_minutes, p.device_limit
+    SELECT s.*, p.duration_minutes, p.device_limit,
+           p.download_kbps, p.upload_kbps
     FROM sessions s
     JOIN packages p ON s.package_id = p.id
     WHERE s.client_mac = ?
@@ -154,6 +158,9 @@ async function reauthorizeRoamingSession({
     radioId,
     site,
     durationMinutes: remaining,
+    // Preserve bandwidth limits from original package
+    downloadKbps: session.download_kbps || null,
+    uploadKbps:   session.upload_kbps   || null,
   });
 
   // Log the roam event (non-destructive — separate table)

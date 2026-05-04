@@ -126,7 +126,7 @@ async function getHotspotSession(omadacId) {
 // Uses OpenAPI token — authorizes a MAC via the newer endpoint
 // Available in Omada controller 5.x with OpenAPI enabled
 
-async function authorizeClientOpenAPI(clientMac, durationMinutes) {
+async function authorizeClientOpenAPI(clientMac, durationMinutes, downloadKbps, uploadKbps) {
   const omadacId   = await getControllerId();
   const token      = await getToken();
   const { siteId } = await getSiteId(omadacId, token);
@@ -134,9 +134,13 @@ async function authorizeClientOpenAPI(clientMac, durationMinutes) {
   const mac = normaliseMac(clientMac);
   const url = `${BASE}/openapi/v1/${omadacId}/sites/${siteId}/hotspot/clients/${mac}/auth`;
 
-  const res = await client.post(url, {
-    duration: durationMinutes * 60, // seconds
-  }, {
+  const body = { duration: durationMinutes * 60 }; // seconds
+
+  // Apply bandwidth limits if configured on the package (values in kbps)
+  if (downloadKbps && downloadKbps > 0) body.downloadLimit = downloadKbps;
+  if (uploadKbps   && uploadKbps   > 0) body.uploadLimit   = uploadKbps;
+
+  const res = await client.post(url, body, {
     headers: {
       Authorization:  `AccessToken=${token}`,
       'Content-Type': 'application/json',
@@ -147,7 +151,11 @@ async function authorizeClientOpenAPI(clientMac, durationMinutes) {
     throw new Error(`OpenAPI MAC auth failed: ${res.data?.msg}`);
   }
 
-  console.log(`✅ Omada OpenAPI: authorized ${mac} for ${durationMinutes}min`);
+  console.log(
+    `✅ Omada OpenAPI: authorized ${mac} for ${durationMinutes}min` +
+    (downloadKbps ? ` ↓${downloadKbps}kbps` : '') +
+    (uploadKbps   ? ` ↑${uploadKbps}kbps`   : '')
+  );
   return { success: true, method: 'openapi' };
 }
 
@@ -157,6 +165,7 @@ async function authorizeClientOpenAPI(clientMac, durationMinutes) {
 
 async function authorizeClientExtPortal({
   clientMac, apMac, ssidName, radioId, site, durationMinutes,
+  downloadKbps, uploadKbps,
 }) {
   const omadacId = await getControllerId();
   const session  = await getHotspotSession(omadacId);
@@ -174,6 +183,10 @@ async function authorizeClientExtPortal({
     t:         Math.floor(Date.now() / 1000),
   };
 
+  // Apply bandwidth limits if configured (values in kbps)
+  if (downloadKbps && downloadKbps > 0) payload.downloadLimit = downloadKbps;
+  if (uploadKbps   && uploadKbps   > 0) payload.uploadLimit   = uploadKbps;
+
   const res = await client.post(authUrl, payload, {
     headers: {
       Cookie:          session.cookie,
@@ -186,7 +199,11 @@ async function authorizeClientExtPortal({
     throw new Error(`extPortal auth failed: ${res.data?.msg}`);
   }
 
-  console.log(`✅ Omada extPortal: authorized ${mac} for ${durationMinutes}min`);
+  console.log(
+    `✅ Omada extPortal: authorized ${mac} for ${durationMinutes}min` +
+    (downloadKbps ? ` ↓${downloadKbps}kbps` : '') +
+    (uploadKbps   ? ` ↑${uploadKbps}kbps`   : '')
+  );
   return { success: true, method: 'extportal' };
 }
 
@@ -214,27 +231,29 @@ async function deauthorizeClient(clientMac) {
 }
 
 // ── Main authorize function — tries OpenAPI first, falls back to extPortal ──
-async function authorizeClient({ clientMac, apMac, ssidName, radioId, site, durationMinutes }) {
+async function authorizeClient({ clientMac, apMac, ssidName, radioId, site, durationMinutes, downloadKbps, uploadKbps }) {
   if (!clientMac) {
     console.warn('⚠️  authorizeClient called with no MAC — skipping');
     return { success: false, skipped: true, reason: 'no_mac' };
   }
 
   if (process.env.OMADA_MOCK === 'true') {
-    console.log(`[MOCK] Authorized ${clientMac} for ${durationMinutes}min`);
+    console.log(`[MOCK] Authorized ${clientMac} for ${durationMinutes}min` +
+      (downloadKbps ? ` ↓${downloadKbps}kbps` : '') +
+      (uploadKbps   ? ` ↑${uploadKbps}kbps`   : ''));
     return { success: true, method: 'mock' };
   }
 
   // Try OpenAPI first (cleaner, stateless)
   try {
-    return await authorizeClientOpenAPI(clientMac, durationMinutes);
+    return await authorizeClientOpenAPI(clientMac, durationMinutes, downloadKbps, uploadKbps);
   } catch(e) {
     console.warn(`OpenAPI auth failed (${e.message}), trying extPortal...`);
   }
 
   // Fallback to Web API v2 extPortal
   try {
-    return await authorizeClientExtPortal({ clientMac, apMac, ssidName, radioId, site, durationMinutes });
+    return await authorizeClientExtPortal({ clientMac, apMac, ssidName, radioId, site, durationMinutes, downloadKbps, uploadKbps });
   } catch(e) {
     console.error(`extPortal auth also failed: ${e.message}`);
     return { success: false, error: e.message };

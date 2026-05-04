@@ -31,12 +31,14 @@ function generateCode() {
   return `MW-${rand(4)}-${rand(4)}`;
 }
 
-// ── Get user's most purchased package ───────────────────────
+// ── Get user's most purchased package (paid sessions only) ──
 function getMostPurchasedPackage(userId) {
   return db.prepare(`
     SELECT package_id, COUNT(*) as cnt
     FROM sessions
-    WHERE user_id = ? AND payment_method IN ('mpesa', 'voucher')
+    WHERE user_id = ?
+      AND payment_method IN ('mpesa', 'kopokopo')
+      AND status != 'terminated'
     GROUP BY package_id
     ORDER BY cnt DESC
     LIMIT 1
@@ -50,16 +52,35 @@ async function checkPunchcard(userId, phone) {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   if (!user) return;
 
-  const PUNCH_TARGET      = getPunchTarget();
-  const totalSessions     = user.total_sessions;
-  const sessionsIntoCycle = totalSessions % PUNCH_TARGET;
+  const PUNCH_TARGET = getPunchTarget();
+
+  // Count only paid sessions for the punch cycle — free/punchcard sessions
+  // do NOT count toward the next milestone (prevents cycle corruption)
+  const paidRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM sessions
+    WHERE user_id = ?
+      AND payment_method IN ('mpesa', 'kopokopo')
+      AND status != 'terminated'
+  `).get(userId);
+  const paidSessions     = paidRow?.cnt || 0;
+  const sessionsIntoCycle = paidSessions % PUNCH_TARGET;
   const sessionsLeft      = sessionsIntoCycle === 0
     ? 0
     : PUNCH_TARGET - sessionsIntoCycle;
 
   // ── Milestone reached ────────────────────────────────────
-  if (sessionsIntoCycle === 0 && totalSessions > 0) {
-    await handleMilestone(user, phone, PUNCH_TARGET);
+  if (sessionsIntoCycle === 0 && paidSessions > 0) {
+    // Guard: check we haven't already issued a voucher for this exact milestone
+    const milestoneNumber = Math.floor(paidSessions / PUNCH_TARGET);
+    const alreadyIssued = db.prepare(`
+      SELECT id FROM vouchers
+      WHERE created_for_user_id = ?
+        AND punchcard_milestone = ?
+    `).get(userId, milestoneNumber);
+
+    if (!alreadyIssued) {
+      await handleMilestone(user, phone, PUNCH_TARGET, milestoneNumber);
+    }
     return;
   }
 
@@ -68,33 +89,47 @@ async function checkPunchcard(userId, phone) {
 }
 
 // ── Handle milestone: generate voucher + send SMS ─────────
-async function handleMilestone(user, phone, PUNCH_TARGET) {
+async function handleMilestone(user, phone, PUNCH_TARGET, milestoneNumber) {
   try {
-    // Find most purchased package
+    // Find most purchased package (paid sessions only)
     const topPkg = getMostPurchasedPackage(user.id);
-    if (!topPkg) return;
+    if (!topPkg) {
+      console.warn(`Punchcard milestone: no paid package found for user ${user.id}`);
+      return;
+    }
 
-    const pkg  = db.prepare('SELECT * FROM packages WHERE id = ? AND is_active = 1').get(topPkg.package_id);
-    if (!pkg) return;
+    const pkg = db.prepare('SELECT * FROM packages WHERE id = ? AND is_active = 1').get(topPkg.package_id);
+    if (!pkg) {
+      console.warn(`Punchcard milestone: package ${topPkg.package_id} not found/inactive for user ${user.id}`);
+      return;
+    }
 
     // Generate unique voucher code
     let code;
-    do { code = generateCode(); }
-    while (db.prepare('SELECT id FROM vouchers WHERE code = ?').get(code));
+    let attempts = 0;
+    do {
+      code = generateCode();
+      attempts++;
+      if (attempts > 20) throw new Error('Could not generate unique voucher code after 20 attempts');
+    } while (db.prepare('SELECT id FROM vouchers WHERE code = ?').get(code));
 
     // Set expiry 7 days from now
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Insert free voucher
+    // Insert free voucher — tag with user + milestone so we can guard against duplicates.
+    // NOTE: If your vouchers table doesn't yet have created_for_user_id / punchcard_milestone
+    // columns, run this migration once:
+    //   ALTER TABLE vouchers ADD COLUMN created_for_user_id INTEGER REFERENCES users(id);
+    //   ALTER TABLE vouchers ADD COLUMN punchcard_milestone INTEGER;
     db.prepare(`
-      INSERT INTO vouchers (code, package_id, site_id, expires_at)
-      VALUES (?, ?, (SELECT id FROM sites LIMIT 1), ?)
-    `).run(code, pkg.id, expiresAt);
+      INSERT INTO vouchers (code, package_id, site_id, expires_at, created_for_user_id, punchcard_milestone)
+      VALUES (?, ?, (SELECT id FROM sites LIMIT 1), ?, ?, ?)
+    `).run(code, pkg.id, expiresAt, user.id, milestoneNumber);
 
-    // FIX: Reset punch_count to 0 so dots reset on the frontend
+    // Reset punch_count so the frontend dots reset correctly
     db.prepare(`UPDATE users SET punch_count = 0 WHERE id = ?`).run(user.id);
 
-    console.log(`🎉 Punchcard milestone! Free voucher ${code} generated for ${phone}`);
+    console.log(`🎉 Punchcard milestone #${milestoneNumber}! Free voucher ${code} generated for user ${user.id} (${phone})`);
 
     // Send congratulatory SMS
     const tmpl = db.prepare(
@@ -103,12 +138,12 @@ async function handleMilestone(user, phone, PUNCH_TARGET) {
 
     const message = tmpl
       ? fillTemplate(tmpl.content, {
-          company:   'Monarch Wireless',
-          package:   pkg.name,
+          company:  'Monarch Wireless',
+          package:  pkg.name,
           code,
-          expiry:    new Date(expiresAt).toLocaleDateString('en-KE'),
-          sessions:  user.total_sessions,
-          target:    PUNCH_TARGET,
+          expiry:   new Date(expiresAt).toLocaleDateString('en-KE'),
+          sessions: PUNCH_TARGET * milestoneNumber,
+          target:   PUNCH_TARGET,
         })
       : `🎉 Congratulations! You've completed ${PUNCH_TARGET} sessions on Monarch Wireless! ` +
         `You've earned a FREE ${pkg.name} session. Your voucher code: ${code}. ` +
@@ -122,7 +157,7 @@ async function handleMilestone(user, phone, PUNCH_TARGET) {
     });
 
   } catch(e) {
-    console.error('Punchcard milestone error:', e.message);
+    console.error(`Punchcard milestone error for user ${user.id}:`, e.message, e.stack);
   }
 }
 

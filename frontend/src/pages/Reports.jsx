@@ -19,6 +19,7 @@ const CATEGORIES = [
   { value: 'power',    label: 'Power / Electric',  icon: Zap       },
   { value: 'other',    label: 'Other',             icon: Package   },
 ];
+
 function getCatIcon(cat) { return (CATEGORIES.find(c => c.value === cat) || CATEGORIES[5]).icon; }
 function getCatLabel(cat){ return (CATEGORIES.find(c => c.value === cat) || CATEGORIES[5]).label; }
 function fmt(n) { return Number(n||0).toLocaleString('en-KE',{minimumFractionDigits:0}); }
@@ -205,17 +206,41 @@ export default function Reports() {
   const [loading,    setLoading]    = useState(true);
   const [showCosts,  setShowCosts]  = useState(false);
   const [showAddForm,setShowAddForm]= useState(false);
-  const LOCKED = ['isp-default','hw-default','vps-default'];
+  const LOCKED = ['isp-default', 'hw-default', 'vps-default'];
 
   const loadExpenses = useCallback(() => {
     api.get('/payment/expenses').then(r=>setExpenses(r.data.expenses||[])).catch(console.error);
   }, []);
 
   useEffect(() => {
-    Promise.all([api.get('/dashboard'), api.get('/payment/expenses')])
-      .then(([dash, exp]) => { setDashboard(dash.data); setExpenses(exp.data.expenses||[]); })
-      .catch(console.error).finally(()=>setLoading(false));
-  }, []);
+    let isMounted = true;
+    
+    // We update loading via the async flow to prevent the synchronous set-state-in-effect warning
+    const fetchData = async () => {
+      try {
+        const monthStart = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+        const lastDay    = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        const monthEnd   = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+        const [dash, exp] = await Promise.all([
+          api.get('/dashboard', { params: { month_start: monthStart, month_end: monthEnd } }),
+          api.get('/payment/expenses'),
+        ]);
+
+        if (isMounted) {
+          setDashboard(dash.data);
+          setExpenses(exp.data.expenses || []);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { isMounted = false; };
+  }, [selectedMonth, selectedYear]);
 
   async function handleSaveExpense(id, form) { await api.put(`/payment/expenses/${id}`, form); loadExpenses(); }
   async function handleAddExpense(form)       { await api.post('/payment/expenses', form);       loadExpenses(); }

@@ -43,15 +43,19 @@ function CustomTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const { admin } = useAuth();
   const canCollect = admin?.role === 'super_admin' || admin?.role === 'site_manager';
+  const isSiteManager = admin?.role === 'site_manager';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/dashboard')
+    // site_managers only see revenue from their assigned APs via /hosts/dashboard
+    // super_admin sees the global overview via /dashboard
+    const endpoint = isSiteManager ? '/hosts/dashboard' : '/dashboard';
+    api.get(endpoint)
       .then(r => setData(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [isSiteManager]);
 
   if (loading) return (
     <div className={styles.loading}>
@@ -60,6 +64,93 @@ export default function Dashboard() {
   );
 
   if (!data) return <div className={styles.loading}>Failed to load dashboard</div>;
+
+  // ── Site Manager view — uses /hosts/dashboard data shape ──
+  if (isSiteManager) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div>
+            <div className={styles.headerLabel}>Overview</div>
+            <h1 className={styles.headerTitle}>My Revenue</h1>
+          </div>
+          <div className={styles.headerMeta}>
+            <div className={styles.liveIndicator}>
+              <span className={styles.liveDot} />
+              Live
+            </div>
+            {canCollect && <MpesaButton label="Collect Payment" />}
+          </div>
+        </div>
+
+        <div className={styles.statsGrid}>
+          <StatCard
+            label="My Share Today"
+            value={`KES ${(data.total_today_share || 0).toLocaleString()}`}
+            sub={`KES ${(data.total_today_gross || 0).toLocaleString()} gross`}
+            icon={CreditCard}
+            color="var(--accent)"
+            delay={0}
+          />
+          <StatCard
+            label="My Share This Month"
+            value={`KES ${(data.total_month_share || 0).toLocaleString()}`}
+            sub={`KES ${(data.total_month_gross || 0).toLocaleString()} gross`}
+            icon={TrendingUp}
+            color="var(--green)"
+            delay={50}
+          />
+          <StatCard
+            label="Access Points"
+            value={(data.aps || []).length}
+            sub={`${(data.aps || []).filter(a => a.status === 'online').length} online`}
+            icon={Wifi}
+            color="var(--cyan)"
+            delay={100}
+          />
+          <StatCard
+            label="Active Clients"
+            value={(data.aps || []).reduce((s, a) => s + (a.connected_clients || 0), 0)}
+            sub="Currently connected"
+            icon={Activity}
+            color="#8b5cf6"
+            delay={150}
+          />
+        </div>
+
+        {/* Per-AP breakdown */}
+        {(data.aps || []).length > 0 && (
+          <div className={styles.sitesRow}>
+            {data.aps.map(ap => (
+              <div key={ap.mac} className={styles.siteCard}>
+                <div className={styles.siteStatus}>
+                  <Wifi size={14} color={ap.status === 'online' ? 'var(--green)' : 'var(--text3)'} />
+                  <span className={styles.siteName}>{ap.name || ap.mac}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>
+                    ({ap.revenue_share_pct ?? 70}% share)
+                  </span>
+                </div>
+                <div className={styles.siteStats}>
+                  <span>
+                    Today: <strong>KES {(ap.today_host_share || 0).toLocaleString()}</strong>
+                    <span style={{ color: 'var(--text3)', marginLeft: 4 }}>
+                      (KES {(ap.today_gross || 0).toLocaleString()} gross)
+                    </span>
+                  </span>
+                  <span className={styles.amount}>
+                    Month: KES {(ap.month_host_share || 0).toLocaleString()}
+                    <span style={{ color: 'var(--text3)', marginLeft: 4 }}>
+                      (KES {(ap.month_gross || 0).toLocaleString()} gross)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
