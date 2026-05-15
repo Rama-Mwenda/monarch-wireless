@@ -197,13 +197,15 @@ function AddExpenseForm({ onAdd, onClose }) {
 
 export default function Reports() {
   const { admin } = useAuth();
-  const isViewer = admin?.role === 'viewer';
+  const isViewer      = admin?.role === 'viewer';
+  const isSiteManager = admin?.role === 'site_manager';
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
   const [dashboard,  setDashboard]  = useState(null);
   const [expenses,   setExpenses]   = useState([]);
   const [loading,    setLoading]    = useState(true);
+  const [apSummary,  setApSummary]  = useState(null);
   const [showCosts,  setShowCosts]  = useState(false);
   const [showAddForm,setShowAddForm]= useState(false);
   const LOCKED = ['isp-default', 'hw-default', 'vps-default'];
@@ -222,14 +224,21 @@ export default function Reports() {
         const lastDay    = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         const monthEnd   = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-        const [dash, exp] = await Promise.all([
+        const fetches = [
           api.get('/dashboard', { params: { month_start: monthStart, month_end: monthEnd } }),
           api.get('/payment/expenses'),
-        ]);
+        ];
+        const isSuper = admin?.role === 'super_admin';
+        if (isSuper) {
+          fetches.push(api.get('/hosts/ap-summary', { params: { month_start: monthStart, month_end: monthEnd } }));
+        }
+
+        const [dash, exp, apSum] = await Promise.all(fetches);
 
         if (isMounted) {
           setDashboard(dash.data);
           setExpenses(exp.data.expenses || []);
+          if (apSum) setApSummary(apSum.data);
           setLoading(false);
         }
       } catch (err) {
@@ -240,7 +249,7 @@ export default function Reports() {
 
     fetchData();
     return () => { isMounted = false; };
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, admin?.role]);
 
   async function handleSaveExpense(id, form) { await api.put(`/payment/expenses/${id}`, form); loadExpenses(); }
   async function handleAddExpense(form)       { await api.post('/payment/expenses', form);       loadExpenses(); }
@@ -571,6 +580,45 @@ export default function Reports() {
             </div>
           </div>
         </div>
+
+        {/* ── AP Breakdown — super_admin only ── */}
+        {!isSiteManager && apSummary && apSummary.aps?.length > 0 && (
+          <div className={styles.apSection}>
+            <div className={styles.sectionTitle}>Access Point Breakdown — {monthLabel}</div>
+            <div className={styles.apTable}>
+              <div className={styles.apTableHead}>
+                <span>Access Point</span>
+                <span>Host</span>
+                <span>Sessions</span>
+                <span>Gross</span>
+                <span>Host Share</span>
+                <span>Monarch Cut</span>
+              </div>
+              {apSummary.aps.map((ap, i) => {
+                return (
+                  <div key={i} className={styles.apTableRow}>
+                    <span className={styles.apName}>
+                      <span className={`${styles.apDot} ${ap.status === 'online' ? styles.apDotOnline : ''}`} />
+                      {ap.name}
+                    </span>
+                    <span className={styles.apHost}>{ap.host_name || '—'}</span>
+                    <span className={styles.apMono}>{ap.sessions}</span>
+                    <span className={styles.apMono}>KES {fmt(ap.gross)}</span>
+                    <span className={styles.apShare}>KES {fmt(ap.host_share)}<span className={styles.apPct}> {ap.revenue_share_pct}%</span></span>
+                    <span className={styles.apMono}>KES {fmt(ap.monarch_cut)}</span>
+                  </div>
+                );
+              })}
+              <div className={`${styles.apTableRow} ${styles.apTableTotal}`}>
+                <span style={{gridColumn:'1/3'}}>Total</span>
+                <span className={styles.apMono}>{apSummary.aps.reduce((s,a)=>s+a.sessions,0)}</span>
+                <span className={styles.apMono}>KES {fmt(apSummary.total_gross)}</span>
+                <span className={styles.apShare}>KES {fmt(apSummary.total_host_share)}</span>
+                <span className={styles.apMono}>KES {fmt(apSummary.total_monarch_cut)}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className={styles.reportFooter}>
           <span>Monarch Wireless · Designers Hotspot · Nairobi</span>

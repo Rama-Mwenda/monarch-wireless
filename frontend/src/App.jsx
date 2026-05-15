@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import Sms from './pages/Sms';
 import HostDashboard from './pages/HostDashboard';
 import HostPricing from './pages/HostPricing';
+import HostReports from './pages/HostReports';
 import Network from './pages/Network';
 import Reports from './pages/Reports';
 import ForgotPassword from './pages/ForgotPassword';
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="/host/pricing"  element={<HostPricing />} />
             <Route path="/host/clients"  element={<LiveClients />} />
             <Route path="/host/vouchers" element={<Vouchers />} />
+            <Route path="/host/reports"  element={<HostReports />} />
             <Route path="/host/settings" element={<Settings />} />
           </Route>
 

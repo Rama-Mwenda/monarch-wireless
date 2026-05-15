@@ -189,10 +189,13 @@ router.put('/packages/:mac', requireAuth, (req, res) => {
 });
 
 // ── GET /api/hosts/revenue/:mac ───────────────────────────────
-// Revenue breakdown for a specific AP
+// Revenue breakdown for a specific AP.
+// Accepts optional ?month_start=YYYY-MM-DD&month_end=YYYY-MM-DD
+// for historical month queries from the host reports page.
 router.get('/revenue/:mac', requireAuth, (req, res) => {
   const { mac } = req.params;
   const { id: adminId, role } = req.admin;
+  const { month_start, month_end } = req.query;
 
   if (!canAccessAP(adminId, role, mac))
     return res.status(403).json({ error: 'Not authorised for this AP' });
@@ -204,33 +207,37 @@ router.get('/revenue/:mac', requireAuth, (req, res) => {
 
   const sharePct = ap.revenue_share_pct ?? 70;
 
-  // Revenue this month
+  // Use provided date range or fall back to current calendar month
+  const periodStart = month_start || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const periodEnd   = month_end   || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  // Revenue for the selected period
   const monthRevenue = db.prepare(`
     SELECT COALESCE(SUM(amount_paid), 0) as total
     FROM sessions
     WHERE ap_mac = ?
-    AND strftime('%Y-%m', start_at) = strftime('%Y-%m', 'now')
-    AND payment_method != 'free'
-  `).get(mac)?.total || 0;
+      AND date(start_at) BETWEEN ? AND ?
+      AND payment_method != 'free'
+  `).get(mac, periodStart, periodEnd)?.total || 0;
 
-  // Revenue today
+  // Revenue today (always current, not period-scoped)
   const todayRevenue = db.prepare(`
     SELECT COALESCE(SUM(amount_paid), 0) as total
     FROM sessions
     WHERE ap_mac = ?
-    AND date(start_at) = date('now')
-    AND payment_method != 'free'
+      AND date(start_at) = date('now')
+      AND payment_method != 'free'
   `).get(mac)?.total || 0;
 
-  // All time revenue
+  // All time revenue (always full history)
   const allTimeRevenue = db.prepare(`
     SELECT COALESCE(SUM(amount_paid), 0) as total
     FROM sessions
     WHERE ap_mac = ?
-    AND payment_method != 'free'
+      AND payment_method != 'free'
   `).get(mac)?.total || 0;
 
-  // Monthly breakdown — last 6 months
+  // Monthly breakdown — last 6 months (always shown for trend chart)
   const monthly = db.prepare(`
     SELECT
       strftime('%Y-%m', start_at) as month,
@@ -244,20 +251,20 @@ router.get('/revenue/:mac', requireAuth, (req, res) => {
     ORDER BY month DESC
   `).all(mac);
 
-  // Package breakdown this month
+  // Package breakdown for the selected period
   const byPackage = db.prepare(`
     SELECT p.name, COUNT(*) as sessions,
            COALESCE(SUM(s.amount_paid), 0) as revenue
     FROM sessions s
     JOIN packages p ON s.package_id = p.id
     WHERE s.ap_mac = ?
-      AND strftime('%Y-%m', s.start_at) = strftime('%Y-%m', 'now')
+      AND date(s.start_at) BETWEEN ? AND ?
       AND s.payment_method != 'free'
     GROUP BY p.id
     ORDER BY revenue DESC
-  `).all(mac);
+  `).all(mac, periodStart, periodEnd);
 
-  // Recent transactions
+  // Recent transactions (always latest, not period-scoped)
   const recent = db.prepare(`
     SELECT s.*, p.name as package_name, u.phone
     FROM sessions s
@@ -271,19 +278,76 @@ router.get('/revenue/:mac', requireAuth, (req, res) => {
   res.json({
     ap,
     revenue_share_pct: sharePct,
-    month_gross:       monthRevenue,
-    month_host_share:  +(monthRevenue * sharePct / 100).toFixed(2),
-    month_monarch_cut: +(monthRevenue * (100 - sharePct) / 100).toFixed(2),
-    today_gross:       todayRevenue,
-    today_host_share:  +(todayRevenue * sharePct / 100).toFixed(2),
-    alltime_gross:     allTimeRevenue,
-    alltime_host_share:+(allTimeRevenue * sharePct / 100).toFixed(2),
-    monthly_breakdown: monthly.map(m => ({
+    month_gross:        monthRevenue,
+    month_host_share:   +(monthRevenue * sharePct / 100).toFixed(2),
+    month_monarch_cut:  +(monthRevenue * (100 - sharePct) / 100).toFixed(2),
+    today_gross:        todayRevenue,
+    today_host_share:   +(todayRevenue * sharePct / 100).toFixed(2),
+    alltime_gross:      allTimeRevenue,
+    alltime_host_share: +(allTimeRevenue * sharePct / 100).toFixed(2),
+    monthly_breakdown:  monthly.map(m => ({
       ...m,
       host_share: +(m.gross * sharePct / 100).toFixed(2),
     })),
-    package_breakdown: byPackage,
-    recent_sessions:   recent,
+    package_breakdown:  byPackage,
+    recent_sessions:    recent,
+    period_start:       periodStart,
+    period_end:         periodEnd,
+  });
+});
+
+// ── GET /api/hosts/ap-summary ─────────────────────────────────
+// Super admin: per-AP revenue breakdown over a selected period.
+// Accepts ?month_start=YYYY-MM-DD&month_end=YYYY-MM-DD
+router.get('/ap-summary', requireAuth, requireSuperAdmin, (req, res) => {
+  const { month_start, month_end } = req.query;
+
+  const periodStart = month_start || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const periodEnd   = month_end   || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  const aps = db.prepare('SELECT * FROM access_points ORDER BY name').all();
+
+  // Per-AP revenue for the period
+  const apRevenue = db.prepare(`
+    SELECT ap_mac,
+           COALESCE(SUM(amount_paid), 0) as gross,
+           COUNT(*) as sessions
+    FROM sessions
+    WHERE date(start_at) BETWEEN ? AND ?
+      AND payment_method != 'free'
+    GROUP BY ap_mac
+  `).all(periodStart, periodEnd);
+
+  const revenueMap = Object.fromEntries(apRevenue.map(r => [r.ap_mac, r]));
+
+  const summary = aps.map(ap => {
+    const rev      = revenueMap[ap.mac] || { gross: 0, sessions: 0 };
+    const sharePct = ap.revenue_share_pct ?? 70;
+    return {
+      mac:          ap.mac,
+      name:         ap.name || ap.mac,
+      status:       ap.status,
+      host_name:    ap.host_name,
+      host_phone:   ap.host_phone,
+      revenue_share_pct: sharePct,
+      gross:        rev.gross,
+      sessions:     rev.sessions,
+      host_share:   +(rev.gross * sharePct / 100).toFixed(2),
+      monarch_cut:  +(rev.gross * (100 - sharePct) / 100).toFixed(2),
+    };
+  });
+
+  const totalGross   = summary.reduce((s, a) => s + a.gross, 0);
+  const totalShare   = summary.reduce((s, a) => s + a.host_share, 0);
+  const totalMonarch = summary.reduce((s, a) => s + a.monarch_cut, 0);
+
+  res.json({
+    period_start:   periodStart,
+    period_end:     periodEnd,
+    aps:            summary,
+    total_gross:    totalGross,
+    total_host_share:   +totalShare.toFixed(2),
+    total_monarch_cut:  +totalMonarch.toFixed(2),
   });
 });
 

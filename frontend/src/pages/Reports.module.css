@@ -417,3 +417,110 @@
     gap: 8px;
   }
 }
+/* ── AP BREAKDOWN TABLE (super admin reports) ──────────────── */
+.apSection {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.apTable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.apTableHead {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr 0.7fr 1fr 1.1fr 1fr;
+  padding: 9px 14px;
+  background: var(--surface3);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+  gap: 8px;
+}
+
+.apTableRow {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr 0.7fr 1fr 1.1fr 1fr;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.apTableRow:hover { background: rgba(255,255,255,0.02); }
+
+.apTableTotal {
+  background: var(--surface3);
+  font-weight: 600;
+  border-top: 2px solid var(--border2) !important;
+}
+
+.apName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.apDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+}
+
+.apDotOnline {
+  background: var(--green);
+  box-shadow: 0 0 5px var(--green);
+}
+
+.apHost {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.apMono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.apShare {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.apPct {
+  font-size: 10px;
+  color: var(--text3);
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .apTableHead,
+  .apTableRow {
+    grid-template-columns: 1.4fr 0.8fr 1fr 1fr;
+  }
+
+  /* Hide host and monarch cut columns on mobile */
+  .apTableHead span:nth-child(2),
+  .apTableRow .apHost,
+  .apTableHead span:last-child,
+  .apTableRow span:last-child {
+    display: none;
+  }
+}
