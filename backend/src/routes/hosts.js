@@ -318,10 +318,13 @@ router.get('/ap-summary', requireAuth, requireSuperAdmin, (req, res) => {
     GROUP BY ap_mac
   `).all(periodStart, periodEnd);
 
-  const revenueMap = Object.fromEntries(apRevenue.map(r => [r.ap_mac, r]));
+  // Normalise MACs to lowercase colon-separated for matching
+  // Sessions and access_points may store MACs in different cases/separators
+  const normMac = m => (m || '').toLowerCase().replace(/-/g, ':').trim();
+  const revenueMap = Object.fromEntries(apRevenue.map(r => [normMac(r.ap_mac), r]));
 
   const summary = aps.map(ap => {
-    const rev      = revenueMap[ap.mac] || { gross: 0, sessions: 0 };
+    const rev      = revenueMap[normMac(ap.mac)] || { gross: 0, sessions: 0 };
     const sharePct = ap.revenue_share_pct ?? 70;
     return {
       mac:          ap.mac,
@@ -398,11 +401,12 @@ router.get('/dashboard', requireAuth, (req, res) => {
     GROUP BY ap_mac
   `).all(...macs);
 
-  const revenueMap = Object.fromEntries(apRevenue.map(r => [r.ap_mac, r]));
-  const todayMap   = Object.fromEntries(todayRevenue.map(r => [r.ap_mac, r.today_gross]));
+  const normMac    = m => (m || '').toLowerCase().replace(/-/g, ':').trim();
+  const revenueMap = Object.fromEntries(apRevenue.map(r => [normMac(r.ap_mac), r]));
+  const todayMap   = Object.fromEntries(todayRevenue.map(r => [normMac(r.ap_mac), r.today_gross]));
 
   const apSummaries = aps.map(ap => {
-    const rev      = revenueMap[ap.mac] || { month_gross: 0, month_sessions: 0 };
+    const rev      = revenueMap[normMac(ap.mac)] || { month_gross: 0, month_sessions: 0 };
     const sharePct = ap.revenue_share_pct ?? 70;
     return {
       ...ap,
