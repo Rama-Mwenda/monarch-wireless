@@ -32,6 +32,7 @@ const hostNav = [
   { to: '/host/pricing',  icon: Package,         label: 'Pricing'    },
   { to: '/host/clients',  icon: Users,           label: 'Clients'    },
   { to: '/host/vouchers', icon: Ticket,          label: 'Vouchers'   },
+  { to: '/host/reports',  icon: BarChart2,       label: 'Reports'    },
   { to: '/host/settings', icon: SettingsIcon,    label: 'Settings'   },
 ];
 
@@ -70,7 +71,7 @@ export default function Sidebar({ open, onClose }) {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === '/host'}
               onClick={onClose}
               className={({ isActive }) =>
                 `${styles.navItem} ${isActive ? styles.active : ''}`
